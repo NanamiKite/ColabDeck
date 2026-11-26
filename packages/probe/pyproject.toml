@@ -1,0 +1,9 @@
+[project]
+name = "colabdeck-probe"
+version = "0.1.0"
+description = "ColabDeck remote runtime probe (stdlib only)"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

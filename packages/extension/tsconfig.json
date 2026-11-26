@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["vscode", "node"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

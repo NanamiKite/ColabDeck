@@ -1,0 +1,326 @@
+{
+  "name": "colabdeck",
+  "displayName": "ColabDeck",
+  "description": "Companion operations and cost-control panel for the official Google Colab VS Code extension.",
+  "publisher": "nanami",
+  "version": "0.1.0",
+  "private": true,
+  "icon": "resources/icon.png",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.99.3"
+  },
+  "categories": [
+    "Other",
+    "Data Science"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "extensionDependencies": [
+    "google.colab",
+    "ms-toolsai.jupyter"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "ColabDeck reads remote monitoring data; it requires a trusted workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "ColabDeck needs a Colab workspace and terminal; virtual workspaces are not supported."
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "colabdeck",
+          "title": "ColabDeck",
+          "icon": "resources/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "colabdeck": [
+        {
+          "id": "colabdeck.dashboard",
+          "name": "Dashboard",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "colabdeck.openDashboard",
+        "title": "ColabDeck: Open Dashboard"
+      },
+      {
+        "command": "colabdeck.refresh",
+        "title": "ColabDeck: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "colabdeck.stopMonitoring",
+        "title": "ColabDeck: Stop Monitoring",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "colabdeck.startMonitoring",
+        "title": "ColabDeck: Start Monitoring",
+        "icon": "$(play)"
+      },
+      {
+        "command": "colabdeck.restartProbe",
+        "title": "ColabDeck: Restart Monitoring"
+      },
+      {
+        "command": "colabdeck.openProbeLog",
+        "title": "ColabDeck: View Diagnostics"
+      },
+      {
+        "command": "colabdeck.showServerInfo",
+        "title": "ColabDeck: Show Server Info"
+      },
+      {
+        "command": "colabdeck.idleGuard.cancel",
+        "title": "ColabDeck: Cancel Idle Countdown"
+      },
+      {
+        "command": "colabdeck.idleGuard.snooze",
+        "title": "ColabDeck: Snooze Idle Guard"
+      },
+      {
+        "command": "colabdeck.idleGuard.releaseNow",
+        "title": "ColabDeck: Release Colab Server Now"
+      },
+      {
+        "command": "colabdeck.toolkit.killProcess",
+        "title": "ColabDeck: Kill GPU Process..."
+      },
+      {
+        "command": "colabdeck.toolkit.clearCudaCache",
+        "title": "ColabDeck: Clear CUDA Cache"
+      },
+      {
+        "command": "colabdeck.toolkit.scanDisk",
+        "title": "ColabDeck: Scan Disk..."
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "colabdeck.refresh",
+          "when": "view == colabdeck.dashboard",
+          "group": "navigation@10"
+        },
+        {
+          "command": "colabdeck.stopMonitoring",
+          "when": "view == colabdeck.dashboard",
+          "group": "navigation@20"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "colabdeck.openDashboard"
+        },
+        {
+          "command": "colabdeck.refresh"
+        },
+        {
+          "command": "colabdeck.stopMonitoring"
+        },
+        {
+          "command": "colabdeck.startMonitoring"
+        },
+        {
+          "command": "colabdeck.restartProbe"
+        },
+        {
+          "command": "colabdeck.openProbeLog"
+        },
+        {
+          "command": "colabdeck.showServerInfo"
+        },
+        {
+          "command": "colabdeck.idleGuard.cancel"
+        },
+        {
+          "command": "colabdeck.idleGuard.snooze"
+        },
+        {
+          "command": "colabdeck.idleGuard.releaseNow"
+        },
+        {
+          "command": "colabdeck.toolkit.killProcess"
+        },
+        {
+          "command": "colabdeck.toolkit.clearCudaCache"
+        },
+        {
+          "command": "colabdeck.toolkit.scanDisk"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ColabDeck",
+      "properties": {
+        "colabdeck.probe.sampleIntervalMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "maximum": 60000,
+          "scope": "window",
+          "description": "Monitoring sample interval in milliseconds."
+        },
+        "colabdeck.probe.launchMethod": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "kernel",
+            "terminal"
+          ],
+          "default": "auto",
+          "scope": "window",
+          "description": "Monitoring startup method."
+        },
+        "colabdeck.probe.probeDir": {
+          "type": "string",
+          "default": "/content/.colabdeck",
+          "scope": "window",
+          "description": "Remote monitoring data directory. Must be under /content."
+        },
+        "colabdeck.idleGuard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Enable idle protection."
+        },
+        "colabdeck.idleGuard.gpuUtilizationThresholdPct": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "window",
+          "description": "GPU utilization threshold in percent."
+        },
+        "colabdeck.idleGuard.idleDebounceMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "maximum": 600000,
+          "scope": "window",
+          "description": "How long GPU utilization must stay below the threshold before idle timing starts."
+        },
+        "colabdeck.idleGuard.idleThresholdMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 120,
+          "scope": "window",
+          "description": "How long the GPU must stay idle before the countdown starts."
+        },
+        "colabdeck.idleGuard.countdownSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 10,
+          "maximum": 3600,
+          "scope": "window",
+          "description": "Countdown length before the official release dialog opens."
+        },
+        "colabdeck.idleGuard.staleSampleSeconds": {
+          "type": "number",
+          "default": 15,
+          "minimum": 5,
+          "maximum": 300,
+          "scope": "window",
+          "description": "Pause idle protection when monitoring data is older than this."
+        },
+        "colabdeck.idleGuard.minRuntimeMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 120,
+          "scope": "window",
+          "description": "Grace period after connecting before idle detection starts."
+        },
+        "colabdeck.idleGuard.snoozeMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 720,
+          "scope": "window",
+          "description": "How long the snooze action suppresses idle detection."
+        },
+        "colabdeck.idleGuard.autoRelease": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Open the official Colab release dialog when the countdown expires. The user still confirms it."
+        },
+        "colabdeck.idleGuard.requireKernelIdle": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "scope": "window",
+          "description": "Pause release while the notebook is busy."
+        },
+        "colabdeck.dashboard.timeRange": {
+          "type": "string",
+          "enum": [
+            "15m",
+            "30m",
+            "1h"
+          ],
+          "default": "30m",
+          "scope": "window",
+          "description": "Default dashboard time range."
+        },
+        "colabdeck.dashboard.showProcesses": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show the GPU process table by default."
+        },
+        "colabdeck.logging.level": {
+          "type": "string",
+          "enum": [
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug",
+            "trace"
+          ],
+          "default": "info",
+          "scope": "window",
+          "description": "ColabDeck output channel log level."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@colabdeck/shared": "*",
+    "@types/node": "^22.13.10",
+    "@types/vscode": "1.99.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.5"
+  }
+}
