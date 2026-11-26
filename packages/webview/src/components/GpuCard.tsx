@@ -1,12 +1,13 @@
 import type { JSX } from 'preact';
 import { computeWindowPeakMemory, formatBytes, formatPercent } from '@colabdeck/shared';
-import type { TelemetrySample } from '@colabdeck/shared';
+import type { ProbeView, TelemetrySample } from '@colabdeck/shared';
 import { SampleAge } from './SampleAge.js';
 
 interface GpuCardProps {
   readonly latest: TelemetrySample | null;
   readonly samples: readonly TelemetrySample[];
   readonly connection: string;
+  readonly probe: ProbeView | null;
 }
 
 function Bar({ value, max, label }: { readonly value: number | null; readonly max: number | null; readonly label: string }): JSX.Element {
@@ -31,7 +32,7 @@ function Bar({ value, max, label }: { readonly value: number | null; readonly ma
   );
 }
 
-export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Element {
+export function GpuCard({ latest, samples, connection, probe }: GpuCardProps): JSX.Element {
   const aggregate = latest?.gpuAggregate ?? null;
   const peak = computeWindowPeakMemory(samples);
   const connected = connection === 'connected';
@@ -40,6 +41,9 @@ export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Elem
   const emptyMessage = isStale
     ? 'No telemetry. Reconnect or restart the probe to resume monitoring.'
     : 'Waiting for the first telemetry sample…';
+  const probeDetail = probe
+    ? `Probe PID ${probe.pid} · ${probe.status} · every ${Math.max(1, Math.round(probe.sampleIntervalMs / 1000))}s`
+    : null;
   return (
     <section class={`card gpu-card${isStale ? ' is-stale' : ''}`}>
       <div class="card-head">
@@ -47,7 +51,11 @@ export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Elem
           <div class="eyebrow">Accelerator</div>
           <h2>{title}</h2>
         </div>
-        <SampleAge receivedAtMs={latest?.receivedAtMs ?? null} connected={connected} />
+        <SampleAge
+          receivedAtMs={latest?.receivedAtMs ?? null}
+          connected={connected}
+          detail={probeDetail}
+        />
       </div>
       {aggregate ? (
         <>

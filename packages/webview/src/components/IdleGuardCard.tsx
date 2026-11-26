@@ -2,6 +2,11 @@ import type { JSX } from 'preact';
 import { formatDuration } from '@colabdeck/shared';
 import type { CountdownView, IdleGuardTransitionView, IdleGuardView } from '@colabdeck/shared';
 
+function humanizeReason(reason: string): string {
+  const text = reason.replace(/-/g, ' ').replace(/\bgpu\b/gi, 'GPU');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 interface IdleGuardCardProps {
   readonly idle: IdleGuardView | null;
   readonly countdown: CountdownView | null;
@@ -49,7 +54,7 @@ export function IdleGuardCard({
   const showsIdleTiming =
     idle.status === 'ACTIVE' || idle.status === 'IDLE_DETECTED' || idle.status === 'COUNTDOWN_WARNING';
   const idleTimingLabel = showsIdleTiming
-    ? `threshold ${idle.thresholdPct.toFixed(0)}% · idle ${formatDuration(idle.idleForMs)} of ${formatDuration(idle.idleThresholdMs)}`
+    ? `threshold ${idle.thresholdPct.toFixed(0)}% · idle ${formatDuration(idle.idleForMs)} (limit ${formatDuration(idle.idleThresholdMs)})`
     : idle.status === 'DISCONNECTED'
       ? 'No server connected'
       : idle.status === 'SYNCING'
@@ -81,7 +86,7 @@ export function IdleGuardCard({
       {idle.snoozedUntilMs ? (
         <p class="muted">Snoozed until {new Date(idle.snoozedUntilMs).toLocaleTimeString()}.</p>
       ) : null}
-      {idle.reason ? <p class="muted">Reason: {idle.reason}</p> : null}
+      {idle.reason ? <p class="muted">Reason: {humanizeReason(idle.reason)}</p> : null}
       {idle.kernelBusy === true ? (
         <p class="warning-text">Notebook is busy; automatic release is paused.</p>
       ) : null}
@@ -132,7 +137,7 @@ export function IdleGuardCard({
               <li key={`${transition.atMs}-${transition.to}-${index}`}>
                 <span>{new Date(transition.atMs).toLocaleTimeString()}</span>
                 <span>{statusLabels[transition.from] ?? transition.from} → {statusLabels[transition.to] ?? transition.to}</span>
-                <span class="muted">{transition.reason}</span>
+                <span class="muted">{humanizeReason(transition.reason)}</span>
               </li>
             ))}
           </ul>

@@ -99,7 +99,12 @@ export function App(): JSX.Element {
       ) : (
         <div class="dashboard">
           <section class="column dashboard-main">
-            <GpuCard latest={latest} samples={state.samples} connection={connection} />
+            <GpuCard
+              latest={latest}
+              samples={state.samples}
+              connection={connection}
+              probe={snapshot.probe ?? null}
+            />
             <div class="charts-grid">
               <MetricChart
                 title="GPU utilization"

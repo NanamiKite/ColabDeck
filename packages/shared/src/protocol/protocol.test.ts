@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { probeSampleSchema } from './probe.js';
-import { webviewToHostMessageSchema } from './webview.js';
+import { timeRangeToMs, webviewToHostMessageSchema } from './webview.js';
 
 describe('protocol schemas', () => {
+  it('maps dashboard time ranges to milliseconds', () => {
+    expect(timeRangeToMs('15m')).toBe(900_000);
+    expect(timeRangeToMs('30m')).toBe(1_800_000);
+    expect(timeRangeToMs('1h')).toBe(3_600_000);
+  });
+
   it('accepts a minimal valid probe sample and rejects unknown fields', () => {
     const sample = {
       type: 'SAMPLE',
