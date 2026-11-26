@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { ColabDeckError } from '@colabdeck/shared';
 
 export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
@@ -63,8 +64,16 @@ export class Logger implements vscode.Disposable {
     const timestamp = new Date().toISOString();
     const rendered = values
       .map((value) => {
+        if (value instanceof ColabDeckError) {
+          // The stack only carries the headline; code/detail/cause are what identifies the failure.
+          const parts = [this.render(value), `code=${value.code}`];
+          if (value.detail) {
+            parts.push(`detail=${value.detail}`);
+          }
+          return parts.join(' ');
+        }
         if (value instanceof Error) {
-          return value.stack ?? value.message;
+          return this.render(value);
         }
         if (typeof value === 'object' && value !== null) {
           try {
@@ -77,5 +86,15 @@ export class Logger implements vscode.Disposable {
       })
       .join(' ');
     this.channel.appendLine(`[${timestamp}] [${level.toUpperCase()}] ${rendered}`);
+  }
+
+  private render(error: Error): string {
+    const message = error.stack ?? error.message;
+    const cause = (error as Error & { cause?: unknown }).cause;
+    if (cause === undefined || cause === error) {
+      return message;
+    }
+    const causeText = cause instanceof Error ? cause.stack ?? cause.message : String(cause);
+    return `${message}\n  caused by: ${causeText}`;
   }
 }
