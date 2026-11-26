@@ -1,12 +1,14 @@
 # ColabDeck
 
-官方 Google Colab VS Code 扩展（`google.colab`）的伴生面板：训练时看 GPU 曲线不卡内核，GPU 闲下来提醒你释放 runtime，再附一个以只读为主的排障工具箱。
+官方 Google Colab VS Code 扩展（`google.colab`）的伴生面板。训练时看 GPU 曲线不卡内核，GPU 闲下来倒计时提醒你释放 runtime，再附一组以只读为主的排障工具。
 
 [快速开始](#快速开始) · [文档](#文档) · [配置](docs/configuration.md) · [已知限制](#已知限制)
 
+![ColabDeck Dashboard：GPU 指标与曲线、Idle Guard 倒计时、GPU 进程表](docs/images/dashboard.png)
+
 ## 它做三件事
 
-- **监控**：GPU 利用率、VRAM（含窗口峰值）、系统 RAM、磁盘曲线，加 GPU 温度、功耗、CPU 负载读数。采集由 runtime 内的独立进程完成，训练 cell 跑着也能刷新。
+- **监控**：GPU 利用率、VRAM（含窗口峰值）、系统 RAM、磁盘四条曲线，加 GPU 温度、功耗、CPU 负载读数。采集由 runtime 里的独立进程完成，训练 cell 跑着也能刷新。
 - **Idle Guard**：GPU 连续低于 5% 满 5 分钟后开始 120 秒倒计时，可 Cancel / Snooze / Release now。倒计时结束打开官方释放对话框，由你确认。
 - **工具箱**：GPU 进程表、带确认的 Kill、只读磁盘大文件扫描、通过主内核清 CUDA 缓存。
 
@@ -14,7 +16,7 @@
 
 前置：VS Code >= 1.99.3，已安装并登录官方 `google.colab` 和 `ms-toolsai.jupyter`。
 
-1. 安装扩展：克隆仓库后 `npm install && npm run package:vsix`，在 VS Code 中安装 `release/` 下生成的 VSIX。开发时也可以直接按 `F5`。
+1. 安装 ColabDeck，见下方"从源码安装"。
 2. 在官方 Colab 扩展中分配 runtime。
 3. 点击活动栏或状态栏打开 Dashboard，点击 **Mount server**。Dashboard 默认在侧边栏打开，拖宽后呈两列布局。
 4. 状态变为 `connected` 后曲线开始更新。
@@ -22,9 +24,17 @@
 一直停在 `Starting`：点 **Refresh**；错误卡里有 **Retry** 和 **View diagnostics**。连接处于 `error` / `stale`，或已选服务器但 `disconnected` 时，头部会出现 **Restart probe**。
 
 <details>
-<summary><b>F5 启动后闪退（退出码 134）</b></summary>
+<summary><b>从源码安装</b></summary>
 
-VS Code 1.146.0 + js-debug 1.140.1 下，Extension Development Host 可能在几秒内退出并报 `134`。仓库已在 `.vscode/settings.json` 关闭 `debug.javascript.enableNetworkView`；如果工作区或用户设置覆盖了它，改回 `false` 后重启 VS Code。
+需要 Node.js >= 20、npm >= 10。克隆仓库后：
+
+```bash
+npm install
+npm run package:vsix
+code --install-extension release/colabdeck-<version>.vsix
+```
+
+调试运行、测试和上架流程见 [开发文档](docs/development.md)。
 
 </details>
 
