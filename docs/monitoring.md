@@ -18,7 +18,7 @@ VRAM 另有 **Window peak**：当前时间窗内观测到的显存最大值。�
 
 ## Colab 实际能给什么
 
-- GPU 利用率、显存、温度、功耗：`nvidia-smi` 在 T4、L4、A100 上通常都有；温度或功耗列可能返回 `[N/A]`，对应读数显示 `—`。
+- GPU 利用率、显存、温度、功耗：`nvidia-smi` 在 T4、L4、A100 上通常都有；温度或功耗列可能返回 `[N/A]`，该读数显示 `—`。
 - CPU 负载：`os.getloadavg()`，任何 Linux runtime 都可用。
 - CPU 温度：探针会读 thermal zone 和 hwmon，云 VM 上通常读不到，Dashboard 不显示。
 - 官方 Colab 扩展的 Resources 视图走未文档化的 `api/colab/resources`，只有 RAM、磁盘、GPU RAM。ColabDeck 不调用它，也不读私有的 `v1/user-info`，所以不显示算力点余额。
