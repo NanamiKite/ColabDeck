@@ -24,7 +24,7 @@
 | `colabdeck.idleGuard.minRuntimeMinutes` | `5` | 0–120 | 连接后的宽限期，期间不检测闲置。 |
 | `colabdeck.idleGuard.snoozeMinutes` | `30` | 1–720 | Snooze 时长，也是通知按钮 "Snooze 30m" 的数字。 |
 | `colabdeck.idleGuard.autoRelease` | `true` | boolean | 倒计时结束时是否打开官方释放对话框。官方对话框仍需你确认。 |
-| `colabdeck.idleGuard.requireKernelIdle` | `auto` | `auto` / `always` / `never` | 倒计时结束时对主内核状态的要求，见 [idle-guard.md](idle-guard.md#不会自动释放的情况)。 |
+| `colabdeck.idleGuard.requireKernelIdle` | `auto` | `auto` / `always` / `never` | 倒计时结束时对主内核状态的要求，见 [idle-guard.md](idle-guard.md#不会自动释放的情况)。Marketplace 安装读不到内核状态（Jupyter 按发布者白名单放行 Kernel API），保持 `auto` 即可；`always` 会让倒计时一直停在 `kernel-busy`。 |
 
 判定流程见 [`idle-guard.md`](idle-guard.md)。
 

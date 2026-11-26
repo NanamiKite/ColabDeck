@@ -12,7 +12,7 @@
 
 - **监控**：GPU 利用率、VRAM（含窗口峰值）、系统 RAM、磁盘四条曲线，加 GPU 温度、功耗、CPU 负载读数。采集由 runtime 里的独立进程完成，训练 cell 跑着也能刷新。
 - **Idle Guard**：GPU 连续低于 5% 满 5 分钟后开始 120 秒倒计时，可 Cancel / Snooze / Release now。倒计时结束打开官方释放对话框，由你确认。
-- **工具箱**：GPU 进程表、带确认的 Kill、只读磁盘大文件扫描、通过主内核清 CUDA 缓存。
+- **工具箱**：GPU 进程表、带确认的 Kill、只读磁盘大文件扫描。
 
 ## 快速开始
 
@@ -59,6 +59,7 @@ code --install-extension release/colabdeck-<version>.vsix
 - 一次只监控一个选中的服务器。
 - 启动采集时官方终端会短暂闪现。
 - 不显示算力点余额：ColabDeck 不调用 Google 私有配额接口，也不模拟 Jupyter / Colab 私有协议。
+- Jupyter 扩展不向此发布者开放 Kernel API，ColabDeck 读不到 notebook 内核是否正忙，Idle Guard 按"未知"处理照常释放；清 CUDA 缓存功能不可用。
 - GPU 温度和功耗依赖 `nvidia-smi`，个别机型返回 `[N/A]`，显示为 `—`。
 
 ## 许可证

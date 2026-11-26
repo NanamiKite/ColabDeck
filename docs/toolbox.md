@@ -31,9 +31,9 @@ Dashboard 下方的工具箱有三个标签页：Processes、Disk、CUDA cache�
 
 ## CUDA cache
 
-在 notebook 主内核里执行 `torch.cuda.empty_cache()`，通过 Jupyter 扩展的 Kernel API 下发。
+在 notebook 主内核里执行 `torch.cuda.empty_cache()`，通过 Jupyter 扩展的 Kernel API 下发。**Marketplace 安装时不可用**：Jupyter 扩展按发布者白名单放行 Kernel API，ColabDeck 不在名单里，点击会得到 Jupyter 的 "Please contact the Jupyter Extension to get access to the Kernel API" 错误。
 
-- 需要先在 Jupyter 扩展中允许 ColabDeck 访问内核，否则提示去 Settings 授权。
+- 这是 Jupyter 扩展的限制，无法通过设置绕过；在 notebook 里手动执行 `torch.cuda.empty_cache()` 即可。
 - 找不到该服务器的活动内核时提示先启动内核。
 - 内核正忙时直接报错 "The notebook kernel is busy. Wait for the current cell to finish."，不排队。
 - `torch.cuda` 不可用时只打印 "CUDA is not available"。

@@ -12,7 +12,7 @@ A companion panel for the official Google Colab VS Code extension (`google.colab
 
 - **Monitoring**: GPU utilization, VRAM (with window peak), system RAM, and disk charts, plus GPU temperature, power draw, and CPU load readouts. A separate process inside the runtime does the sampling, so the dashboard keeps updating while a training cell runs.
 - **Idle Guard**: after the GPU stays below 5% for 5 minutes, a 120-second countdown starts. Cancel, snooze, or release. When the countdown ends, the official release dialog opens; you confirm it.
-- **Toolbox**: GPU process list, a confirmed Kill, a read-only scan for large files, and CUDA cache cleanup through the notebook kernel.
+- **Toolbox**: GPU process list with a confirmed Kill, and a read-only scan for large files.
 
 ## Quick start
 
@@ -61,6 +61,7 @@ The guides are written in Chinese.
 - Only one selected server is monitored at a time.
 - The official terminal flashes briefly when sampling starts.
 - No compute-unit balance: ColabDeck does not call Google's private quota API or imitate Jupyter and Colab private protocols.
+- The Jupyter extension denies its Kernel API to this publisher, so ColabDeck cannot read whether the notebook kernel is busy. Idle Guard treats it as unknown and releases; the CUDA cache action is unavailable.
 - GPU temperature and power depend on `nvidia-smi`; some GPUs report `[N/A]`, shown as `—`.
 
 ## License

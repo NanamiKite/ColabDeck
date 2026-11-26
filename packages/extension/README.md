@@ -6,7 +6,7 @@ Companion operations and cost-control panel for the official Google Colab VS Cod
 
 - Non-blocking GPU/VRAM/RAM/disk/temperature telemetry sampled by a detached standard-library probe.
 - Idle Guard state machine with countdown, cancel/snooze, fail-safe disconnect handling, and assisted release through the official `colab.removeServer` dialog.
-- GPU process list with guarded kill, read-only disk scan, and CUDA cache cleanup through the notebook kernel.
+- GPU process list with guarded kill and a read-only disk scan.
 - Status bar summary and Preact + uPlot dashboard.
 
 ## Requirements

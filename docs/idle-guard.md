@@ -73,6 +73,8 @@ Idle Guard 盯着 GPU 利用率：连续低于阈值就算闲置，闲置够久�
 
 内核状态只在 `IDLE_DETECTED` 和 `COUNTDOWN_WARNING` 期间查询，5 秒内没结果按 `null` 处理；`requireKernelIdle=never` 时不查询。
 
+**Marketplace 安装的限制**：Jupyter 扩展按发布者白名单放行 Kernel API，ColabDeck 不在名单里，所以内核状态**读不到**，始终按 `null` 处理。效果：`auto`（默认）不受影响，照常放行；`always` 永远等不到 "明确 idle"，倒计时会一直停在 `kernel-busy`，不要用。ColabDeck 不会为此主动请求 Kernel API，也不会触发 Jupyter 的授权弹窗。
+
 ## 操作入口
 
 - Webview Idle Guard 卡片：Cancel / Snooze Xm / Release now。卡片显示阈值、已闲置时长；Snooze 后显示 `Snoozed until` 时间。
