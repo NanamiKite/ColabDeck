@@ -249,8 +249,20 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
             });
           }
           await vscode.commands.executeCommand('colab.mountServer');
-          await this.registry.refresh({ discoverKernelApi: this.configProvider().launchMethod === 'kernel' });
-          await this.monitoring.start(this.registry.selected());
+          const servers = await this.registry.refresh({ discoverKernelApi: this.configProvider().launchMethod === 'kernel' });
+          if (servers.length === 0) {
+            // The official command returns silently when no runtime is assigned or the picker was dismissed.
+            throw new ColabDeckError('No Colab server is mounted.', {
+              code: 'SERVER_UNAVAILABLE',
+              detail: 'Assign a runtime in the Colab extension first, then mount it again.',
+              recoverable: true,
+              action: 'MOUNT_COLAB_SERVER',
+            });
+          }
+          const selected = this.registry.selected();
+          if (selected) {
+            await this.monitoring.start(selected);
+          }
           this.sendSnapshot();
           this.sendTelemetryBatch(this.range);
           return;

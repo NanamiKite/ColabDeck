@@ -42,7 +42,7 @@ export class ServerRegistry implements vscode.Disposable {
 
   async refresh(options: { readonly discoverKernelApi?: boolean } = {}): Promise<readonly ServerDescriptor[]> {
     const mounted = this.discoverMountedFolders();
-    const persisted = this.discoverPersisted();
+    const persisted = await this.discoverPersisted(mounted);
     const kernelApi = options.discoverKernelApi ? await this.discoverKernelApi() : [];
     const merged = mergeServers(mounted, kernelApi, persisted);
     const changed =
@@ -98,9 +98,25 @@ export class ServerRegistry implements vscode.Disposable {
       return true;
     } catch (error) {
       const reason = error instanceof vscode.FileSystemError ? error.code : error instanceof Error ? error.message : String(error);
-      this.logger.warn(`[ServerRegistry] server ${abbreviateId(serverId)} is not reachable (${reason})`);
+      this.logger.debug(`[ServerRegistry] server ${abbreviateId(serverId)} is not reachable (${reason})`);
       return false;
     }
+  }
+
+  /**
+   * A freshly assigned runtime needs a moment before its Jupyter Contents API answers. Give the
+   * remembered id a few short tries before deciding it is gone.
+   */
+  private async waitForServer(serverId: string, attempts = 3, delayMs = 1_000): Promise<boolean> {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      if (await this.validateServer(serverId)) {
+        return true;
+      }
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    return false;
   }
 
   private discoverMountedFolders(): ServerDescriptor[] {
@@ -117,9 +133,22 @@ export class ServerRegistry implements vscode.Disposable {
       }));
   }
 
-  private discoverPersisted(): ServerDescriptor[] {
+  /**
+   * The remembered server is only a hint. Runtime ids change whenever a server is released or
+   * reassigned, and the official extension removes the stale workspace folder on its side, so a
+   * remembered id that nothing else lists is usually dead. Only keep it while the official
+   * colab:// provider still resolves it; otherwise drop it so the dashboard shows a clean
+   * "no server" state instead of auto-starting monitoring against a ghost.
+   */
+  private async discoverPersisted(mounted: readonly ServerDescriptor[]): Promise<ServerDescriptor[]> {
     const persisted = this.context.globalState.get<PersistedServer | undefined>(LAST_SERVER_KEY, undefined);
     if (!persisted?.id) {
+      return [];
+    }
+    const alreadyListed = mounted.some((server) => server.id === persisted.id);
+    if (!alreadyListed && !(await this.waitForServer(persisted.id))) {
+      this.logger.warn(`[ServerRegistry] forgot unreachable server ${abbreviateId(persisted.id)}`);
+      await this.context.globalState.update(LAST_SERVER_KEY, undefined);
       return [];
     }
     return [
