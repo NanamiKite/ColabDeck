@@ -53,11 +53,11 @@ VS Code 1.146.0 + js-debug 1.140.1 下，js-debug 在扩展宿主 inspector 初�
 
 ## 发布到 Marketplace
 
-扩展 ID 是 `nanami.colabdeck`，来自 `packages/extension/package.json` 的 `publisher` 和 `name`。
+扩展 ID 是 `NanamiKite.colabdeck`，来自 `packages/extension/package.json` 的 `publisher` 和 `name`。
 
 一次性准备：
 
-1. 在 <https://marketplace.visualstudio.com/manage/publishers/> 创建 publisher，ID 必须等于 `publisher`（当前 `nanami`）。ID 创建后不能改。
+1. 在 <https://marketplace.visualstudio.com/manage/publishers/> 创建 publisher，ID 必须等于 `publisher`（当前 `NanamiKite`）。ID 创建后不能改。
 2. 选一种发布凭据：
 
 | 方式 | 用法 | 说明 |
@@ -73,7 +73,7 @@ PAT 的 Organization 选 All accessible organizations，Scopes 选 Marketplace �
 1. 把 `packages/extension/package.json` 的 `version` 改成新版本。Marketplace 不接受重复版本。
 2. `npm run package:vsix`，先用 VSIX 本地装一遍。
 3. `npm run publish:vsix`。脚本默认取 `release/` 里最新的 VSIX，也可以显式传路径；发布前列出 `publisher.name`、版本和目标页面，确认后才执行。`--yes` 跳过确认，非交互环境必须带它。
-4. 到 <https://marketplace.visualstudio.com/items?itemName=nanami.colabdeck> 确认，并用 `code --install-extension nanami.colabdeck` 装一次。
+4. 到 <https://marketplace.visualstudio.com/items?itemName=NanamiKite.colabdeck> 确认，并用 `code --install-extension NanamiKite.colabdeck` 装一次。
 
 ## 目录
 

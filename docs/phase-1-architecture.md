@@ -402,7 +402,7 @@ packages/probe      独立运行，构建时复制到 extension/resources/probe
 {
   "name": "colabdeck",
   "displayName": "ColabDeck",
-  "publisher": "nanami",
+  "publisher": "NanamiKite",
   "version": "0.1.0",
   "engines": { "vscode": "^1.99.3" },
   "extensionDependencies": ["google.colab", "ms-toolsai.jupyter"],

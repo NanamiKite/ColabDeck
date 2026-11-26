@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const vscode = require('vscode');
 
-const EXTENSION_ID = 'nanami.colabdeck';
+const EXTENSION_ID = 'NanamiKite.colabdeck';
 const DASHBOARD_FOCUS_COMMAND = 'colabdeck.dashboard.focus';
 const OFFICIAL_DEPENDENCIES = ['google.colab', 'ms-toolsai.jupyter'];
 const CONTRIBUTED_COMMANDS = [

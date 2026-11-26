@@ -2,7 +2,7 @@
   "name": "colabdeck",
   "displayName": "ColabDeck",
   "description": "Companion operations and cost-control panel for the official Google Colab VS Code extension.",
-  "publisher": "nanami",
+  "publisher": "NanamiKite",
   "version": "0.1.0",
   "private": true,
   "repository": {
