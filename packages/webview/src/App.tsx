@@ -1,6 +1,6 @@
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import type { TimeRange, UiError } from '@colabdeck/shared';
+import type { TelemetrySample, TimeRange, UiError } from '@colabdeck/shared';
 import { useHostMessenger } from './hooks/useHostMessenger.js';
 import { EmptyState } from './components/EmptyState.js';
 import { ErrorBanner } from './components/ErrorBanner.js';
@@ -9,6 +9,16 @@ import { Header } from './components/Header.js';
 import { IdleGuardCard } from './components/IdleGuardCard.js';
 import { MetricChart } from './components/MetricChart.js';
 import { Toolbox } from './components/Toolbox.js';
+
+const gpuUtilization = (sample: TelemetrySample): number | null => sample.gpuAggregate?.utilizationPct ?? null;
+const vramUsedGiB = (sample: TelemetrySample): number | null =>
+  sample.gpuAggregate?.memoryUsedBytes === null || sample.gpuAggregate?.memoryUsedBytes === undefined
+    ? null
+    : sample.gpuAggregate.memoryUsedBytes / 1024 / 1024 / 1024;
+const ramUsedGiB = (sample: TelemetrySample): number | null => sample.ram.usedBytes / 1024 / 1024 / 1024;
+const diskUsedGiB = (sample: TelemetrySample): number | null => sample.disk.usedBytes / 1024 / 1024 / 1024;
+const percentLabel = (value: number | null): string => (value === null ? '—' : `${value.toFixed(1)}%`);
+const gibLabel = (value: number | null): string => (value === null ? '—' : `${value.toFixed(1)} GiB`);
 
 export function App(): JSX.Element {
   const { state, post } = useHostMessenger();
@@ -110,21 +120,17 @@ export function App(): JSX.Element {
                 title="GPU utilization"
                 unit="%"
                 samples={state.samples}
-                accessor={(sample) => sample.gpuAggregate?.utilizationPct ?? null}
+                accessor={gpuUtilization}
                 color="#3794ff"
                 themeColor="--vscode-charts-blue"
                 yMax={100}
-                valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)}%`)}
+                valueFormatter={percentLabel}
               />
               <MetricChart
                 title="VRAM"
                 unit="GiB"
                 samples={state.samples}
-                accessor={(sample) =>
-                  sample.gpuAggregate?.memoryUsedBytes === null || sample.gpuAggregate?.memoryUsedBytes === undefined
-                    ? null
-                    : sample.gpuAggregate.memoryUsedBytes / 1024 / 1024 / 1024
-                }
+                accessor={vramUsedGiB}
                 color="#f7b955"
                 themeColor="--vscode-charts-yellow"
                 yMax={
@@ -132,27 +138,27 @@ export function App(): JSX.Element {
                     ? latest.gpuAggregate.memoryTotalBytes / 1024 / 1024 / 1024
                     : 100
                 }
-                valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
+                valueFormatter={gibLabel}
               />
               <MetricChart
                 title="System RAM"
                 unit="GiB"
                 samples={state.samples}
-                accessor={(sample) => sample.ram.usedBytes / 1024 / 1024 / 1024}
+                accessor={ramUsedGiB}
                 color="#89d185"
                 themeColor="--vscode-charts-green"
                 yMax={latest ? latest.ram.totalBytes / 1024 / 1024 / 1024 : 100}
-                valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
+                valueFormatter={gibLabel}
               />
               <MetricChart
                 title="Disk used"
                 unit="GiB"
                 samples={state.samples}
-                accessor={(sample) => sample.disk.usedBytes / 1024 / 1024 / 1024}
+                accessor={diskUsedGiB}
                 color="#d18616"
                 themeColor="--vscode-charts-orange"
                 yMax={latest ? latest.disk.totalBytes / 1024 / 1024 / 1024 : 100}
-                valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
+                valueFormatter={gibLabel}
               />
             </div>
           </section>

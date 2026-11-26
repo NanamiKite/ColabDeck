@@ -77,10 +77,14 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
       webviewView.onDidChangeVisibility(() => {
         if (webviewView.visible) {
           this.sendSnapshot();
+          this.sendTelemetryBatch(this.range);
         }
       }),
       this.monitoring.onStatus(() => this.handleMonitoringStatus()),
-      this.monitoring.onReset(() => this.sendSnapshot()),
+      this.monitoring.onReset(() => {
+        this.sendSnapshot();
+        this.sendTelemetryBatch(this.range);
+      }),
       this.monitoring.onSample(({ sample }) => {
         if (webviewView.visible) {
           this.post({ type: 'TELEMETRY_APPEND', sample });
@@ -104,7 +108,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
   sendSnapshot(): void {
     const snapshot = this.buildSnapshot();
     this.post({ type: 'SNAPSHOT', snapshot });
-    this.sendTelemetryBatch(this.range);
     const idle = this.idleGuard.snapshot;
     this.post({
       type: 'IDLE_GUARD_STATE',
@@ -153,8 +156,14 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     if (key === this.lastStatusKey) {
       return;
     }
+    const previousServerId = this.lastStatusKey.split('|')[0];
+    const previousBootId = this.lastStatusKey.split('|')[2];
     this.lastStatusKey = key;
     this.sendSnapshotIfVisible();
+    // The buffer belongs to one probe process. Refill it when that process or the server changes.
+    if (status.serverId && (status.serverId !== previousServerId || (status.probe?.bootId ?? '') !== previousBootId)) {
+      this.sendTelemetryBatch(this.range);
+    }
   }
 
   private sendTelemetryBatch(range: TimeRange): void {
@@ -191,6 +200,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
             return;
           }
           this.sendSnapshot();
+          this.sendTelemetryBatch(this.range);
           return;
         case 'REQUEST_SNAPSHOT':
           this.range = message.range;
@@ -200,6 +210,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
           this.registry.select(message.serverId);
           await this.monitoring.start(this.registry.selected());
           this.sendSnapshot();
+          this.sendTelemetryBatch(this.range);
           return;
         case 'IDLE_GUARD_CANCEL':
           this.idleGuard.cancel('webview');
@@ -241,6 +252,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
           await this.registry.refresh({ discoverKernelApi: this.configProvider().launchMethod === 'kernel' });
           await this.monitoring.start(this.registry.selected());
           this.sendSnapshot();
+          this.sendTelemetryBatch(this.range);
           return;
         case 'RELOAD_WINDOW':
           await vscode.commands.executeCommand('workbench.action.reloadWindow');
@@ -255,6 +267,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
           await this.registry.refresh({ discoverKernelApi: this.configProvider().launchMethod === 'kernel' });
           await this.monitoring.restart();
           this.sendSnapshot();
+          this.sendTelemetryBatch(this.range);
           return;
       }
     } catch (error) {

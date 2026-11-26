@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import type { JSX } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import uPlot from 'uplot';
@@ -31,7 +32,7 @@ function chartWidth(container: HTMLElement): number {
   return Math.max(MIN_CHART_WIDTH, container.clientWidth);
 }
 
-export function MetricChart({
+export const MetricChart = memo(function MetricChart({
   title,
   unit,
   samples,
@@ -161,4 +162,4 @@ export function MetricChart({
       </div>
     </section>
   );
-}
+});
