@@ -140,6 +140,7 @@ export interface DashboardSettings {
     readonly thresholdPct: number;
     readonly idleThresholdMinutes: number;
     readonly countdownSeconds: number;
+    readonly snoozeMinutes: number;
     readonly autoRelease: boolean;
     readonly requireKernelIdle: 'auto' | 'always' | 'never';
   };

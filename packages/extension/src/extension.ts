@@ -59,8 +59,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       },
       getKernelBusy: (serverId) => kernelClient.getStatus(serverId),
       showCountdownNotification: async (message, actions) => {
+        const snoozeMinutes = Math.max(1, Math.round(config.idleGuard.snoozeMs / 60_000));
+        const snoozeLabel = `Snooze ${snoozeMinutes}m`;
         const labels = actions.map((action) =>
-          action === 'CANCEL' ? 'Cancel' : action === 'SNOOZE' ? 'Snooze 30m' : 'Release now',
+          action === 'CANCEL' ? 'Cancel' : action === 'SNOOZE' ? snoozeLabel : 'Release now',
         );
         const picked = await vscode.window.showWarningMessage(message, ...labels);
         if (!picked) {
@@ -69,7 +71,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (picked === 'Cancel') {
           return 'CANCEL';
         }
-        if (picked === 'Snooze 30m') {
+        if (picked === snoozeLabel) {
           return 'SNOOZE';
         }
         return 'RELEASE_NOW';

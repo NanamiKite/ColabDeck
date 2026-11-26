@@ -24,6 +24,7 @@ export function App(): JSX.Element {
   const range = rangeOverride ?? settings?.timeRange ?? '30m';
   const selectedId = snapshot?.selectedServerId ?? null;
   const connection = snapshot?.connection ?? 'disconnected';
+  const snoozeMinutes = settings?.idleGuard.snoozeMinutes ?? 30;
 
   if (state.mismatch) {
     return (
@@ -75,9 +76,9 @@ export function App(): JSX.Element {
           requestSnapshot(nextRange);
         }}
         onRefresh={() => {
-          post({ type: 'RETRY_PROBE' });
           requestSnapshot(range);
         }}
+        onRestart={() => post({ type: 'RETRY_PROBE' })}
         onOpenSettings={() => post({ type: 'OPEN_SETTINGS' })}
       />
       <ErrorBanner
@@ -161,13 +162,14 @@ export function App(): JSX.Element {
               countdown={countdown}
               transitions={transitions}
               countdownMs={(settings?.idleGuard.countdownSeconds ?? 120) * 1000}
+              snoozeMinutes={snoozeMinutes}
               onToggle={(enabled) => post({ type: 'IDLE_GUARD_SET_ENABLED', enabled })}
               onCancel={() => post({ type: 'IDLE_GUARD_CANCEL', requestId: crypto.randomUUID(), source: 'webview' })}
               onSnooze={() =>
                 post({
                   type: 'IDLE_GUARD_SNOOZE',
                   requestId: crypto.randomUUID(),
-                  durationMs: 30 * 60_000,
+                  durationMs: snoozeMinutes * 60_000,
                   source: 'webview',
                 })
               }

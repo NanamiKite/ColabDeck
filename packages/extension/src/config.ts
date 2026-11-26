@@ -90,6 +90,7 @@ export function toDashboardSettings(config: ColabDeckConfig): import('@colabdeck
       thresholdPct: config.idleGuard.gpuUtilizationThresholdPct,
       idleThresholdMinutes: config.idleGuard.idleThresholdMs / 60_000,
       countdownSeconds: config.idleGuard.countdownMs / 1000,
+      snoozeMinutes: config.idleGuard.snoozeMs / 60_000,
       autoRelease: config.idleGuard.autoRelease,
       requireKernelIdle: config.idleGuard.requireKernelIdle,
     },

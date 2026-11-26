@@ -9,6 +9,7 @@ interface HeaderProps {
   readonly onSelect: (serverId: string) => void;
   readonly onRange: (range: TimeRange) => void;
   readonly onRefresh: () => void;
+  readonly onRestart: () => void;
   readonly onOpenSettings: () => void;
 }
 
@@ -20,6 +21,7 @@ export function Header({
   onSelect,
   onRange,
   onRefresh,
+  onRestart,
   onOpenSettings,
 }: HeaderProps): JSX.Element {
   const connectionLabel: Readonly<Record<string, string>> = {
@@ -74,6 +76,17 @@ export function Header({
           </select>
         </label>
         <span class={`badge ${connectionClass}`}>{connectionLabel[connection] ?? 'Unknown'}</span>
+        {connection === 'error' ||
+        connection === 'stale' ||
+        (connection === 'disconnected' && selectedId !== null) ? (
+          <button
+            class="secondary small"
+            title="Restart the monitoring probe"
+            onClick={onRestart}
+          >
+            Restart probe
+          </button>
+        ) : null}
         <button
           class="icon-button"
           title="Refresh monitoring"

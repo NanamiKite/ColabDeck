@@ -7,6 +7,7 @@ interface IdleGuardCardProps {
   readonly countdown: CountdownView | null;
   readonly transitions: readonly IdleGuardTransitionView[];
   readonly countdownMs: number;
+  readonly snoozeMinutes: number;
   readonly onToggle: (enabled: boolean) => void;
   readonly onCancel: () => void;
   readonly onSnooze: () => void;
@@ -18,6 +19,7 @@ export function IdleGuardCard({
   countdown,
   transitions,
   countdownMs,
+  snoozeMinutes,
   onToggle,
   onCancel,
   onSnooze,
@@ -44,6 +46,17 @@ export function IdleGuardCard({
     UNSUPPORTED: 'Unavailable',
   };
   const statusLabel = statusLabels[idle.status] ?? 'Unknown';
+  const showsIdleTiming =
+    idle.status === 'ACTIVE' || idle.status === 'IDLE_DETECTED' || idle.status === 'COUNTDOWN_WARNING';
+  const idleTimingLabel = showsIdleTiming
+    ? `threshold ${idle.thresholdPct.toFixed(0)}% · idle ${formatDuration(idle.idleForMs)} of ${formatDuration(idle.idleThresholdMs)}`
+    : idle.status === 'DISCONNECTED'
+      ? 'No server connected'
+      : idle.status === 'SYNCING'
+        ? 'Waiting for telemetry'
+        : idle.status === 'DISABLED'
+          ? 'Idle Guard is off'
+          : '';
   return (
     <section class="card idle-card">
       <div class="card-head">
@@ -62,13 +75,14 @@ export function IdleGuardCard({
       </div>
       <div class="idle-status">
         <span class={`status-pill ${idle.status.toLowerCase()}`}>{statusLabel}</span>
-        <span class="muted">
-          threshold {idle.thresholdPct.toFixed(0)}% · idle {formatDuration(idle.idleForMs)} /{' '}
-          {formatDuration(idle.idleThresholdMs)}
-        </span>
+        <span class="muted">{idleTimingLabel}</span>
       </div>
       {idle.snoozedUntilMs ? (
         <p class="muted">Snoozed until {new Date(idle.snoozedUntilMs).toLocaleTimeString()}.</p>
+      ) : null}
+      {idle.reason ? <p class="muted">Reason: {idle.reason}</p> : null}
+      {idle.kernelBusy === true ? (
+        <p class="warning-text">Notebook is busy; automatic release is paused.</p>
       ) : null}
       {countdown ? (
         <div class="countdown">
@@ -82,6 +96,11 @@ export function IdleGuardCard({
           {countdown.phase === 'expired' ? (
             <p class="muted">Automatic release is off. Use Release now when ready.</p>
           ) : null}
+          {countdown.phase !== 'expired' && !countdown.autoRelease ? (
+            <p class="warning-text">
+              Automatic release is off; use Release now when the countdown ends.
+            </p>
+          ) : null}
           {countdown.phase === 'kernel-busy' ? (
             <p class="muted">Notebook is busy; release will wait.</p>
           ) : null}
@@ -92,7 +111,7 @@ export function IdleGuardCard({
           Cancel
         </button>
         <button class="secondary" disabled={!canSnooze} onClick={onSnooze}>
-          Snooze 30m
+          Snooze {snoozeMinutes}m
         </button>
         <button class="danger" disabled={!canRelease} onClick={onRelease}>
           Release now
@@ -108,11 +127,11 @@ export function IdleGuardCard({
         <details class="transitions">
           <summary>Recent state transitions ({transitions.length})</summary>
           <ul>
-            {transitions.slice(-5).reverse().map((transition, index) => (
+            {transitions.slice(-10).reverse().map((transition, index) => (
               <li key={`${transition.atMs}-${transition.to}-${index}`}>
                 <span>{new Date(transition.atMs).toLocaleTimeString()}</span>
                 <span>{statusLabels[transition.from] ?? transition.from} → {statusLabels[transition.to] ?? transition.to}</span>
-                <span class="muted">State updated</span>
+                <span class="muted">{transition.reason}</span>
               </li>
             ))}
           </ul>
