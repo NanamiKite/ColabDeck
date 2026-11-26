@@ -47,6 +47,21 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+export function formatAge(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) {
+    return '—';
+  }
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ${totalSeconds % 60}s`;
+  }
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
 export function formatPercent(value: number | null | undefined, decimals = 1): string {
   return value === null || value === undefined ? '—' : `${value.toFixed(decimals)}%`;
 }

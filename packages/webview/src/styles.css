@@ -184,6 +184,7 @@ button.icon-button:hover {
 }
 
 .badge.stale,
+.badge.disconnected,
 .badge.error {
   color: var(--cd-danger);
   border-color: var(--cd-danger);
@@ -287,6 +288,26 @@ button.icon-button:hover {
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.freshness {
+  color: var(--cd-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.freshness.stale {
+  color: var(--cd-warning);
+}
+
+.gpu-card.is-stale {
+  border-color: var(--cd-warning);
+}
+
+.gpu-card.is-stale .metric-grid,
+.gpu-card.is-stale .bar-row {
+  opacity: 0.55;
 }
 
 .bar-row {

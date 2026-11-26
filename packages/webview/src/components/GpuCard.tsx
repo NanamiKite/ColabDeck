@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { computeWindowPeakMemory, formatBytes, formatPercent } from '@colabdeck/shared';
 import type { TelemetrySample } from '@colabdeck/shared';
+import { SampleAge } from './SampleAge.js';
 
 interface GpuCardProps {
   readonly latest: TelemetrySample | null;
@@ -26,21 +27,20 @@ function Bar({ value, max, label }: { readonly value: number | null; readonly ma
 export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Element {
   const aggregate = latest?.gpuAggregate ?? null;
   const peak = computeWindowPeakMemory(samples);
-  const connectionLabel: Readonly<Record<string, string>> = {
-    connected: 'Connected',
-    syncing: 'Starting',
-    stale: 'Out of date',
-    disconnected: 'Disconnected',
-    error: 'Error',
-  };
+  const connected = connection === 'connected';
+  const isStale = connection === 'disconnected' || connection === 'stale' || connection === 'error';
+  const title = !latest ? 'Waiting for telemetry' : aggregate ? aggregate.shortName : 'No GPU detected';
+  const emptyMessage = isStale
+    ? 'No telemetry. Reconnect or restart the probe to resume monitoring.'
+    : 'Waiting for the first telemetry sample…';
   return (
-    <section class="card gpu-card">
+    <section class={`card gpu-card${isStale ? ' is-stale' : ''}`}>
       <div class="card-head">
         <div>
           <div class="eyebrow">Accelerator</div>
-          <h2>{aggregate?.shortName ?? 'No GPU detected'}</h2>
+          <h2>{title}</h2>
         </div>
-        <span class={`badge ${connection}`}>{connectionLabel[connection] ?? 'Unknown'}</span>
+        <SampleAge receivedAtMs={latest?.receivedAtMs ?? null} connected={connected} />
       </div>
       {aggregate ? (
         <>
@@ -78,7 +78,7 @@ export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Elem
           <Bar value={latest?.disk.freeBytes ?? null} max={latest?.disk.totalBytes ?? null} label="Disk free" />
         </>
       ) : (
-        <p class="muted">Waiting for GPU telemetry…</p>
+        <p class="muted">{emptyMessage}</p>
       )}
     </section>
   );

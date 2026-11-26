@@ -29,6 +29,11 @@ export function Toolbox({
   connected,
 }: ToolboxProps): JSX.Element {
   const [tab, setTab] = useState<'processes' | 'disk' | 'cuda'>('processes');
+  const refreshProcesses = (): void => {
+    if (connected) {
+      onRefreshProcesses();
+    }
+  };
 
   useEffect(() => {
     if (connected) {
@@ -50,7 +55,7 @@ export function Toolbox({
           class={tab === 'processes' ? 'tab active' : 'tab'}
           onClick={() => {
             setTab('processes');
-            onRefreshProcesses();
+            refreshProcesses();
           }}
         >
           Processes
@@ -67,12 +72,17 @@ export function Toolbox({
           processes={processes}
           source={processSource}
           warning={processWarning}
+          connected={connected}
           onRefresh={onRefreshProcesses}
           onKill={onKill}
         />
       ) : null}
-      {tab === 'disk' ? <DiskScanPanel result={result} onScan={onScan} /> : null}
-      {tab === 'cuda' ? <CudaCacheCard result={result} onClear={onClearCudaCache} /> : null}
+      {tab === 'disk' ? (
+        <DiskScanPanel result={result} onScan={onScan} disabled={!connected} />
+      ) : null}
+      {tab === 'cuda' ? (
+        <CudaCacheCard result={result} onClear={onClearCudaCache} disabled={!connected} />
+      ) : null}
     </section>
   );
 }

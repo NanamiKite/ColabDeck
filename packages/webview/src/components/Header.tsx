@@ -53,6 +53,11 @@ export function Header({
             }}
           >
             {servers.length === 0 ? <option value="">No Colab server</option> : null}
+            {servers.length > 0 && selectedId === null ? (
+              <option value="" disabled>
+                Select a server…
+              </option>
+            ) : null}
             {servers.map((server) => (
               <option key={server.id} value={server.id}>
                 {server.label}

@@ -6,11 +6,19 @@ interface ProcessTableProps {
   readonly processes: readonly GpuProcessView[];
   readonly source: 'nvidia-smi' | 'procfs' | 'none';
   readonly warning: string | null;
+  readonly connected: boolean;
   readonly onRefresh: () => void;
   readonly onKill: (pid: number) => void;
 }
 
-export function ProcessTable({ processes, source, warning, onRefresh, onKill }: ProcessTableProps): JSX.Element {
+export function ProcessTable({
+  processes,
+  source,
+  warning,
+  connected,
+  onRefresh,
+  onKill,
+}: ProcessTableProps): JSX.Element {
   return (
     <div class="process-table">
       <div class="panel-head">
@@ -18,11 +26,14 @@ export function ProcessTable({ processes, source, warning, onRefresh, onKill }: 
           <h3>GPU processes</h3>
           {source === 'procfs' ? <span class="badge syncing">VRAM details unavailable</span> : null}
         </div>
-        <button class="secondary small" onClick={onRefresh}>
+        <button class="secondary small" disabled={!connected} onClick={onRefresh}>
           Refresh
         </button>
       </div>
       {warning ? <p class="warning-text">{warning}</p> : null}
+      {!connected ? (
+        <p class="warning-text">Monitoring is disconnected; the process list may be stale.</p>
+      ) : null}
       {processes.length === 0 ? (
         <p class="muted">No GPU processes</p>
       ) : (
@@ -55,6 +66,7 @@ export function ProcessTable({ processes, source, warning, onRefresh, onKill }: 
                 <td>
                   <button
                     class="danger small"
+                    disabled={!connected}
                     aria-label={`Kill GPU process ${process.pid}`}
                     onClick={() => onKill(process.pid)}
                   >

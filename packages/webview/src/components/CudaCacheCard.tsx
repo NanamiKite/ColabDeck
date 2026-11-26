@@ -5,9 +5,10 @@ import type { ToolboxResult } from '@colabdeck/shared';
 interface CudaCacheCardProps {
   readonly result: ToolboxResult | null;
   readonly onClear: () => void;
+  readonly disabled?: boolean;
 }
 
-export function CudaCacheCard({ result, onClear }: CudaCacheCardProps): JSX.Element {
+export function CudaCacheCard({ result, onClear, disabled = false }: CudaCacheCardProps): JSX.Element {
   const [busy, setBusy] = useState(false);
   const clearResult = result?.kind === 'CLEAR_CUDA_CACHE' ? result : null;
 
@@ -32,7 +33,7 @@ export function CudaCacheCard({ result, onClear }: CudaCacheCardProps): JSX.Elem
         </div>
         <button
           class="secondary"
-          disabled={busy}
+          disabled={busy || disabled}
           onClick={() => {
             setBusy(true);
             onClear();

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatBytesShort, formatDuration, gpuAggregateShortName, gpuShortName, redactCommandLine } from './format.js';
+import {
+  formatAge,
+  formatBytes,
+  formatBytesShort,
+  formatDuration,
+  gpuAggregateShortName,
+  gpuShortName,
+  redactCommandLine,
+} from './format.js';
 
 describe('format helpers', () => {
   it('formats binary bytes', () => {
@@ -14,6 +22,13 @@ describe('format helpers', () => {
     expect(formatDuration(0)).toBe('0:00');
     expect(formatDuration(65_000)).toBe('1:05');
     expect(formatDuration(3_600_000)).toBe('1:00:00');
+  });
+
+  it('formats sample ages', () => {
+    expect(formatAge(3_000)).toBe('3s');
+    expect(formatAge(125_000)).toBe('2m 5s');
+    expect(formatAge(3_780_000)).toBe('1h 3m');
+    expect(formatAge(null)).toBe('—');
   });
 
   it('maps GPU names', () => {

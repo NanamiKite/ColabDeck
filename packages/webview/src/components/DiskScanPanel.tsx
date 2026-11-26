@@ -6,9 +6,10 @@ import type { ToolboxResult } from '@colabdeck/shared';
 interface DiskScanPanelProps {
   readonly result: ToolboxResult | null;
   readonly onScan: (path: string, maxEntries: number, maxDepth: number) => void;
+  readonly disabled?: boolean;
 }
 
-export function DiskScanPanel({ result, onScan }: DiskScanPanelProps): JSX.Element {
+export function DiskScanPanel({ result, onScan, disabled = false }: DiskScanPanelProps): JSX.Element {
   const [path, setPath] = useState('/content');
   const [maxEntries, setMaxEntries] = useState(50);
   const [maxDepth, setMaxDepth] = useState(4);
@@ -62,7 +63,7 @@ export function DiskScanPanel({ result, onScan }: DiskScanPanelProps): JSX.Eleme
         </label>
         <button
           class="secondary"
-          disabled={busy}
+          disabled={busy || disabled}
           onClick={() => {
             setBusy(true);
             onScan(path, maxEntries, maxDepth);

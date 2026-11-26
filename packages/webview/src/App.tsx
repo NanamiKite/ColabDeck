@@ -87,6 +87,7 @@ export function App(): JSX.Element {
       />
       {!selectedId ? (
         <EmptyState
+          hasServers={snapshot.servers.length > 0}
           onMountServer={() => post({ type: 'MOUNT_COLAB_SERVER' })}
           onRetry={() => {
             post({ type: 'RETRY_PROBE' });
