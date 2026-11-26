@@ -1,26 +1,16 @@
 # ColabDeck
 
-ColabDeck 是官方 **Google Colab** VS Code 扩展（`google.colab`）的伴生运维与成本风控面板。它不重复实现连接、登录或配额逻辑，只补齐三类能力：
+官方 **Google Colab** VS Code 扩展（`google.colab`）的伴生运维与成本风控面板。它不重复实现连接、登录或配额逻辑，只补齐三类能力：
 
-1. **非阻塞时序监控**：GPU 利用率、显存（含窗口峰值）、系统 RAM、`/content` 磁盘剩余、温度曲线。
+1. **非阻塞时序监控**：GPU 利用率、显存（含窗口峰值）、系统 RAM、`/content` 磁盘剩余，以及 GPU 温度/功耗读数。采集不依赖训练中的主内核同步执行，训练期间 Dashboard 仍可更新。
 2. **Idle Guard**：GPU 连续低于阈值时累计闲置时间，达到阈值后倒计时提醒；可一键取消/延后，倒计时结束自动打开官方释放对话框（Assisted Release）。
 3. **轻量排障工具箱**：GPU 进程列表、受校验的 Kill、只读磁盘大文件扫描、主内核 CUDA 缓存清理。
 
-现场验收清单见 [`docs/mvp-validation.md`](docs/mvp-validation.md)。
+[快速开始](#快速开始) · [配置](#配置) · [Idle Guard](#idle-guard-行为) · [文档](#文档) · [开发](#开发)
 
-## 架构
+## 快速开始
 
-```text
-packages/
-  shared/      协议类型、zod 校验、RingBuffer、Idle Guard 纯 reducer
-  probe/       colabdeck_probe.py（仅标准库，运行在 Colab runtime）
-  extension/   Extension Host：发现、安装/启动探针、采样、状态栏、Webview、Idle Guard
-  webview/     Preact + uPlot Dashboard
-```
-
-Extension Host 通过官方 Colab 工作区和独立后台采集器读取遥测；采集不依赖训练中的主内核同步执行，因此训练期间 Dashboard 仍可更新。
-
-## 前置条件
+前置条件：
 
 - Node.js >= 20，npm >= 10
 - VS Code >= 1.99.3
@@ -29,34 +19,13 @@ Extension Host 通过官方 Colab 工作区和独立后台采集器读取遥测�
   - `ms-toolsai.jupyter`（Jupyter）
 - Python >= 3.10（探针在 Colab runtime 上运行；本机运行 pytest 需要 pytest）
 
-## 构建与测试
-
-```bash
-npm install
-npm run build
-npm run typecheck
-npm test
-```
-
-`npm test` 依次运行 shared/extension 的 Vitest 与 `packages/probe` 的 pytest。若本机没有全局 pytest，可使用：
-
-```bash
-uv venv .venv
-uv pip install --python .venv/bin/python pytest
-.venv/bin/python -m pytest packages/probe -q
-```
-
-可选地运行 `npm run test:smoke` 检查桌面版 VS Code 中的扩展激活；该命令不连接真实 Colab runtime。
-
-## 运行扩展
-
-1. 在 VS Code 中打开本仓库。
-2. 按 `F5`（已提供 `.vscode/launch.json`），或手动执行 `npm run package:vsix` 后安装 VSIX。
+1. 克隆仓库并执行 `npm install`。
+2. 在 VS Code 中打开仓库，按 `F5`（已提供 `.vscode/launch.json`），或执行 `npm run package:vsix` 后安装 VSIX。
 3. 在官方 Colab 扩展中分配 runtime。
 4. 点击活动栏或状态栏打开 ColabDeck Dashboard，再点击 **Mount server**。
 5. 连接状态变为 `connected` 后，图表会自动开始更新。
 
-如果 Dashboard 长时间显示 `Starting`，先点击错误卡中的 **Retry**；需要诊断信息时点击 **View diagnostics**。
+Dashboard 默认在侧边栏打开，拖宽后呈两列布局。如果长时间显示 `Starting`，先点击 **Refresh**；仍失败时点击错误卡中的 **Retry**，需要诊断信息时点击 **View diagnostics**。连接处于 `error`、`stale`，或已选择服务器但处于 `disconnected` 时，头部还会出现 **Restart probe**。
 
 ### F5 闪退（退出码 134）
 
@@ -82,6 +51,7 @@ uv pip install --python .venv/bin/python pytest
 | `colabdeck.idleGuard.autoRelease` | `true` | 倒计时结束自动打开官方释放对话框 |
 | `colabdeck.idleGuard.requireKernelIdle` | `auto` | `auto` / `always` / `never` |
 | `colabdeck.dashboard.timeRange` | `30m` | 默认时间窗 |
+| `colabdeck.dashboard.showProcesses` | `true` | 是否默认打开 GPU 进程表 |
 | `colabdeck.logging.level` | `info` | 输出通道日志级别 |
 
 ## Idle Guard 行为
@@ -109,3 +79,34 @@ Idle Guard 会在 GPU 持续低利用率时显示倒计时，并提供取消、�
 - [`docs/phase-1-architecture.md`](docs/phase-1-architecture.md)：完整架构、契约、状态机与决策记录。
 - [`docs/protocol.md`](docs/protocol.md)：探针文件、命令队列与 Webview 协议速查。
 - [`docs/mvp-validation.md`](docs/mvp-validation.md)：现场验收清单。
+
+## 开发
+
+```bash
+npm install
+npm run build
+npm run typecheck
+npm test
+```
+
+`npm test` 依次运行 shared/extension 的 Vitest 与 `packages/probe` 的 pytest。若本机没有全局 pytest，可使用：
+
+```bash
+uv venv .venv
+uv pip install --python .venv/bin/python pytest
+.venv/bin/python -m pytest packages/probe -q
+```
+
+可选地运行 `npm run test:smoke` 检查桌面版 VS Code 中的扩展激活；该命令不连接真实 Colab runtime。
+
+### 架构
+
+```text
+packages/
+  shared/      协议类型、zod 校验、RingBuffer、Idle Guard 纯 reducer
+  probe/       colabdeck_probe.py（仅标准库，运行在 Colab runtime）
+  extension/   Extension Host：发现、安装/启动探针、采样、状态栏、Webview、Idle Guard
+  webview/     Preact + uPlot Dashboard
+```
+
+Extension Host 通过官方 Colab 工作区和独立后台采集器读取遥测；采集不依赖训练中的主内核同步执行，因此训练期间 Dashboard 仍可更新。
