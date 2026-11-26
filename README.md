@@ -14,7 +14,7 @@
 
 前置：VS Code >= 1.99.3，已安装并登录官方 `google.colab` 和 `ms-toolsai.jupyter`。
 
-1. 安装扩展：克隆仓库后 `npm install && npm run package:vsix`，在 VS Code 中安装 `packages/extension/` 下生成的 VSIX。开发时也可以直接按 `F5`。
+1. 安装扩展：克隆仓库后 `npm install && npm run package:vsix`，在 VS Code 中安装 `release/` 下生成的 VSIX。开发时也可以直接按 `F5`。
 2. 在官方 Colab 扩展中分配 runtime。
 3. 点击活动栏或状态栏打开 Dashboard，点击 **Mount server**。Dashboard 默认在侧边栏打开，拖宽后呈两列布局。
 4. 状态变为 `connected` 后曲线开始更新。
@@ -36,7 +36,7 @@ VS Code 1.146.0 + js-debug 1.140.1 下，Extension Development Host 可能在几
 | Idle Guard 状态、阈值、释放流程 | [Idle Guard](docs/idle-guard.md) |
 | 进程表、Kill、磁盘扫描、CUDA 缓存 | [工具箱](docs/toolbox.md) |
 | 每个设置项的默认值和取值范围 | [配置](docs/configuration.md) |
-| 构建、测试、目录结构、代码地图 | [开发](docs/development.md) |
+| 构建、测试、打包与发布、目录结构、代码地图 | [开发](docs/development.md) |
 | 探针文件与 Webview 消息协议 | [protocol.md](docs/protocol.md) |
 | 完整架构、转换表与决策记录 | [phase-1-architecture.md](docs/phase-1-architecture.md) |
 | 真实 Colab 验收清单 | [mvp-validation.md](docs/mvp-validation.md) |
