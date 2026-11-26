@@ -1,0 +1,6 @@
+{
+  // VS Code 1.146.0 + js-debug 1.140.1 can send Network.enable while
+  // the extension host inspector is still initializing, triggering an
+  // Electron Node assertion and exit code 134.
+  "debug.javascript.enableNetworkView": false
+}

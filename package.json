@@ -1,0 +1,31 @@
+{
+  "name": "colabdeck-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/shared",
+    "packages/extension",
+    "packages/webview"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w @colabdeck/shared && npm run build -w @colabdeck/webview && npm run build -w colabdeck && npm run sync:probe",
+    "build:shared": "npm run build -w @colabdeck/shared",
+    "build:webview": "npm run build -w @colabdeck/webview",
+    "build:extension": "npm run build -w colabdeck",
+    "typecheck": "npm run build -w @colabdeck/shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build -w @colabdeck/shared && npm run test -w @colabdeck/shared && npm run test -w colabdeck && python3 -m pytest packages/probe -q",
+    "test:shared": "npm run test -w @colabdeck/shared",
+    "test:extension": "npm run test -w colabdeck",
+    "test:probe": "python3 -m pytest packages/probe -q",
+    "test:smoke": "npm run build && node scripts/smoke.mjs",
+    "sync:probe": "node scripts/sync-probe.mjs",
+    "package:vsix": "npm run build && cd packages/extension && npx --yes @vscode/vsce package --allow-missing-repository --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

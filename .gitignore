@@ -1,0 +1,28 @@
+node_modules/
+dist/
+*.vsix
+.vite/
+__pycache__/
+.pytest_cache/
+*.tsbuildinfo
+.venv/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+*.log
+.DS_Store
+
+# Local tooling and CI output
+.agents/
+.aws/
+.codex/
+coverage/
+.nyc_output/
+.eslintcache
+.cache/
+.turbo/
+*.tgz
+*.zip
+
+# Generated copy; canonical probe source lives in packages/probe/
+packages/extension/resources/probe/
