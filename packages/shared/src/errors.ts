@@ -20,7 +20,7 @@ export type ColabDeckErrorCode =
   | 'KILL_REJECTED'
   | 'UNKNOWN';
 
-export type ColabDeckErrorAction = 'RETRY' | 'OPEN_SETTINGS' | 'OPEN_PROBE_LOG' | 'NONE';
+export type ColabDeckErrorAction = 'RETRY' | 'OPEN_SETTINGS' | 'OPEN_PROBE_LOG' | 'MOUNT_COLAB_SERVER' | 'NONE';
 
 export interface ColabDeckErrorOptions {
   readonly code?: ColabDeckErrorCode;

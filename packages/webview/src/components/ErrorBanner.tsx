@@ -12,6 +12,7 @@ const ACTION_LABELS: Readonly<Record<UiError['action'], string>> = {
   RETRY: 'Retry',
   OPEN_SETTINGS: 'Open settings',
   OPEN_PROBE_LOG: 'View diagnostics',
+  MOUNT_COLAB_SERVER: 'Mount server',
   NONE: 'Dismiss',
 };
 

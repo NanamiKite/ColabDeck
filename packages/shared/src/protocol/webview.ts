@@ -134,7 +134,7 @@ export interface IdleGuardTransitionView {
   readonly reason: string;
 }
 
-export type UiErrorAction = 'RETRY' | 'OPEN_SETTINGS' | 'OPEN_PROBE_LOG' | 'NONE';
+export type UiErrorAction = 'RETRY' | 'OPEN_SETTINGS' | 'OPEN_PROBE_LOG' | 'MOUNT_COLAB_SERVER' | 'NONE';
 
 export interface UiError {
   readonly id: string;

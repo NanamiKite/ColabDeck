@@ -97,7 +97,8 @@ export class ServerRegistry implements vscode.Disposable {
       await vscode.workspace.fs.stat(vscode.Uri.from({ scheme: 'colab', authority: serverId, path: '/content' }));
       return true;
     } catch (error) {
-      this.logger.debug(`[ServerRegistry] server ${abbreviateId(serverId)} is not reachable`, error);
+      const reason = error instanceof vscode.FileSystemError ? error.code : error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[ServerRegistry] server ${abbreviateId(serverId)} is not reachable (${reason})`);
       return false;
     }
   }

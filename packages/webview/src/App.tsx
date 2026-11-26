@@ -67,6 +67,8 @@ export function App(): JSX.Element {
       post({ type: 'OPEN_SETTINGS' });
     } else if (action === 'OPEN_PROBE_LOG') {
       post({ type: 'OPEN_PROBE_LOG' });
+    } else if (action === 'MOUNT_COLAB_SERVER') {
+      post({ type: 'MOUNT_COLAB_SERVER' });
     }
   };
 

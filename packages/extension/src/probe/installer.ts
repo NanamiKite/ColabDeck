@@ -45,11 +45,15 @@ export class ProbeInstaller {
     } catch (error) {
       const reason = error instanceof vscode.FileSystemError ? error.code : error instanceof Error ? error.message : String(error);
       this.logger.warn(`[ProbeInstaller] ${content.toString()} is not reachable (${reason})`);
+      const advice =
+        reason === 'Unavailable'
+          ? 'The official Colab extension no longer lists this server, which usually means the runtime was released or reassigned. Run "Colab: Mount Server to Workspace" again, then pick the new server.'
+          : 'Make sure the server is still assigned in the Colab extension and that you are signed in, then retry.';
       throw new ColabDeckError('The Colab server is not reachable.', {
         code: 'SERVER_UNAVAILABLE',
-        detail: `Could not read ${content.toString()} through the official Colab extension (${reason}). Make sure the server is still assigned in the Colab extension, then retry.`,
+        detail: `Could not read ${content.toString()} through the official Colab extension (${reason}). ${advice}`,
         recoverable: true,
-        action: 'RETRY',
+        action: reason === 'Unavailable' ? 'MOUNT_COLAB_SERVER' : 'RETRY',
         cause: error,
       });
     }
