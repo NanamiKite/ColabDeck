@@ -111,10 +111,12 @@ input {
   min-height: 28px;
 }
 
-select:focus,
-input:focus {
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+summary:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
-  outline-offset: -1px;
+  outline-offset: 2px;
 }
 
 button {
@@ -147,7 +149,7 @@ button.secondary:hover {
 
 button.danger {
   background: var(--vscode-errorForeground, #f48771);
-  color: #1a1a1a;
+  color: var(--vscode-editor-background, #1e1e1e);
 }
 
 button.small {
@@ -172,7 +174,7 @@ button.icon-button:hover {
   padding: 2px 7px;
   border-radius: 999px;
   border: 1px solid var(--cd-border);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--cd-muted);
@@ -246,7 +248,7 @@ button.icon-button:hover {
 
 .eyebrow {
   color: var(--cd-muted);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
 }
@@ -287,7 +289,7 @@ button.icon-button:hover {
 
 .metric-label {
   color: var(--cd-muted);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -383,6 +385,47 @@ button.icon-button:hover {
   min-height: 128px;
 }
 
+.chart-plot {
+  position: relative;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border: 1px solid var(--cd-border);
+  border-radius: 4px;
+  background: var(--vscode-editorWidget-background, var(--cd-card));
+  color: var(--cd-foreground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 2;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+}
+
+.uplot {
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: 11px;
+}
+
+.u-legend {
+  font-size: 11px;
+}
+
+.u-hz .u-cursor-x,
+.u-vt .u-cursor-y {
+  border-color: var(--vscode-charts-lines, rgba(128, 128, 128, 0.4));
+}
+
 .idle-status {
   display: flex;
   align-items: center;
@@ -395,7 +438,7 @@ button.icon-button:hover {
   border: 1px solid var(--cd-border);
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -719,5 +762,14 @@ tr:last-child td {
 @container (max-width: 480px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

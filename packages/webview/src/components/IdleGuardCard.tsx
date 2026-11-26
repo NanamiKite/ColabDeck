@@ -67,6 +67,7 @@ export function IdleGuardCard({
         <label class="switch">
           <input
             type="checkbox"
+            aria-label="Idle Guard"
             checked={idle.enabled}
             onChange={(event) => onToggle(event.currentTarget.checked)}
           />

@@ -107,6 +107,7 @@ export function App(): JSX.Element {
                 samples={state.samples}
                 accessor={(sample) => sample.gpuAggregate?.utilizationPct ?? null}
                 color="#3794ff"
+                themeColor="--vscode-charts-blue"
                 yMax={100}
                 valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)}%`)}
               />
@@ -120,6 +121,7 @@ export function App(): JSX.Element {
                     : sample.gpuAggregate.memoryUsedBytes / 1024 / 1024 / 1024
                 }
                 color="#f7b955"
+                themeColor="--vscode-charts-yellow"
                 yMax={
                   latest?.gpuAggregate?.memoryTotalBytes
                     ? latest.gpuAggregate.memoryTotalBytes / 1024 / 1024 / 1024
@@ -133,6 +135,7 @@ export function App(): JSX.Element {
                 samples={state.samples}
                 accessor={(sample) => sample.ram.usedBytes / 1024 / 1024 / 1024}
                 color="#89d185"
+                themeColor="--vscode-charts-green"
                 yMax={latest ? latest.ram.totalBytes / 1024 / 1024 / 1024 : 100}
                 valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
               />
@@ -141,7 +144,8 @@ export function App(): JSX.Element {
                 unit="GiB"
                 samples={state.samples}
                 accessor={(sample) => sample.disk.usedBytes / 1024 / 1024 / 1024}
-                color="#c8c8c8"
+                color="#d18616"
+                themeColor="--vscode-charts-orange"
                 yMax={latest ? latest.disk.totalBytes / 1024 / 1024 / 1024 : 100}
                 valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
               />

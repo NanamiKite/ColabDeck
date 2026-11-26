@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
 import type { ServerView, TimeRange } from '@colabdeck/shared';
+import { RefreshIcon, SettingsIcon } from './Icons.js';
 
 interface HeaderProps {
   readonly servers: readonly ServerView[];
@@ -93,7 +94,7 @@ export function Header({
           aria-label="Refresh monitoring"
           onClick={onRefresh}
         >
-          ↻
+          <RefreshIcon />
         </button>
         <button
           class="icon-button"
@@ -101,7 +102,7 @@ export function Header({
           aria-label="Open ColabDeck settings"
           onClick={onOpenSettings}
         >
-          ⚙
+          <SettingsIcon />
         </button>
       </div>
     </header>

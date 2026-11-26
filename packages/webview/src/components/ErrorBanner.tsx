@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
 import type { UiError } from '@colabdeck/shared';
+import { CloseIcon } from './Icons.js';
 
 interface ErrorBannerProps {
   readonly errors: readonly UiError[];
@@ -47,7 +48,7 @@ export function ErrorBanner({ errors, onDismiss, onAction }: ErrorBannerProps): 
               aria-label="Dismiss error"
               onClick={() => onDismiss(error.id)}
             >
-              ×
+              <CloseIcon />
             </button>
           </div>
         </div>

@@ -17,7 +17,14 @@ function Bar({ value, max, label }: { readonly value: number | null; readonly ma
         <span>{label}</span>
         <span>{formatPercent(percent, 0)}</span>
       </div>
-      <div class="bar-track">
+      <div
+        class="bar-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(percent)}
+        aria-label={label}
+      >
         <div class="bar-fill" style={{ width: `${percent}%` }} />
       </div>
     </div>
