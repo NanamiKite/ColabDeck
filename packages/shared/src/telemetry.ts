@@ -195,6 +195,57 @@ export function telemetryWindow(
   return samples.filter((sample) => sample.timestampMs >= cutoff);
 }
 
+/**
+ * Merges live samples into the dashboard buffer.
+ *
+ * `seq` restarts at 1 whenever the probe restarts, so it cannot identify a sample across restarts.
+ * `timestampMs` comes from the runtime clock and keeps increasing, so it is the identity; when the
+ * same timestamp arrives twice (a batch and an append racing), the newer `receivedAtMs` wins.
+ */
+export function mergeTelemetrySamples(
+  current: readonly TelemetrySample[],
+  incoming: readonly TelemetrySample[],
+  rangeMs: number | null,
+  nowMs: number,
+  maxSamples = 4000,
+): readonly TelemetrySample[] {
+  if (incoming.length === 0) {
+    return current;
+  }
+  const byTimestamp = new Map<number, TelemetrySample>();
+  for (const sample of current) {
+    byTimestamp.set(sample.timestampMs, sample);
+  }
+  for (const sample of incoming) {
+    const existing = byTimestamp.get(sample.timestampMs);
+    if (!existing || sample.receivedAtMs >= existing.receivedAtMs) {
+      byTimestamp.set(sample.timestampMs, sample);
+    }
+  }
+  let merged = [...byTimestamp.values()].sort((left, right) => left.timestampMs - right.timestampMs);
+  if (rangeMs !== null) {
+    const cutoff = nowMs - rangeMs;
+    merged = merged.filter((sample) => sample.timestampMs >= cutoff);
+  }
+  return merged.length > maxSamples ? merged.slice(-maxSamples) : merged;
+}
+
+/**
+ * A batch is authoritative: it replaces the buffer. Samples the host has already streamed but that
+ * are newer than the batch are kept, so a slow batch cannot roll the chart back.
+ */
+export function replaceTelemetrySamples(
+  current: readonly TelemetrySample[],
+  batch: readonly TelemetrySample[],
+): readonly TelemetrySample[] {
+  if (batch.length === 0) {
+    return current;
+  }
+  const newestBatchTimestamp = batch[batch.length - 1]?.timestampMs ?? 0;
+  const streamedTail = current.filter((sample) => sample.timestampMs > newestBatchTimestamp);
+  return streamedTail.length === 0 ? batch : [...batch, ...streamedTail];
+}
+
 export function gpuNameFromAggregate(aggregate: GpuAggregate | null): string {
   if (!aggregate) {
     return 'No GPU';
