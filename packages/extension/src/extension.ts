@@ -5,7 +5,6 @@ import { registerCommands } from './commands/index.js';
 import { ErrorCenter } from './errors/errorCenter.js';
 import { IdleGuardService } from './idleGuard/idleGuardService.js';
 import { KernelClient } from './jupyter/kernelClient.js';
-import { KernelLauncher } from './jupyter/kernelLauncher.js';
 import { Logger } from './log.js';
 import { ProbeCommandClient } from './probe/commandClient.js';
 import { ProbeInstaller } from './probe/installer.js';
@@ -17,7 +16,12 @@ import { TelemetryStore } from './telemetry/store.js';
 import { ToolboxService } from './toolbox/toolboxService.js';
 import { DashboardProvider } from './webview/dashboardProvider.js';
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export interface ColabDeckApi {
+  readonly activationMs: number;
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<ColabDeckApi> {
+  const activationStartedAt = Date.now();
   let config = readConfig();
   const logger = new Logger('ColabDeck', config.logLevel);
   context.subscriptions.push(logger);
@@ -28,13 +32,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const launcher = new TerminalProbeLauncher(logger);
   const commandClient = new ProbeCommandClient(logger);
   const kernelClient = new KernelClient(logger);
-  const kernelLauncher = new KernelLauncher(logger, kernelClient);
   const monitoring = new MonitoringService(
     logger,
     registry,
     installer,
     launcher,
-    kernelLauncher,
     commandClient,
     store,
     () => config,
@@ -165,7 +167,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      void registry.refresh({ discoverKernelApi: config.launchMethod === 'kernel' });
+      void registry.refresh();
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('colabdeck')) {
@@ -195,12 +197,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  await registry.refresh({ discoverKernelApi: config.launchMethod === 'kernel' });
+  await registry.refresh();
   const selected = registry.selected();
   if (selected) {
-    await monitoring.start(selected);
+    // Starting the probe can wait on a terminal for up to 30s. Never block activation on it: VS Code
+    // treats a slow activate() as an unresponsive extension and may restart the host.
+    void monitoring.start(selected).catch((error) => {
+      logger.error(`[ColabDeck] failed to start monitoring for ${selected.label}`, error);
+    });
   }
-  logger.info('[ColabDeck] activated');
+  const activationMs = Date.now() - activationStartedAt;
+  logger.info(`[ColabDeck] activated in ${activationMs}ms`);
+  return { activationMs };
 }
 
 export function deactivate(): void {

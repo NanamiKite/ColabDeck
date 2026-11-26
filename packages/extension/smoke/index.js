@@ -65,8 +65,16 @@ async function runChecks() {
     throw new Error(`${EXTENSION_ID} was not discovered by the extension host.`);
   }
   check(`${EXTENSION_ID} discovered`, true, `v${extension.packageJSON.version}`);
+  // extensionDependencies are activated first, so wall time around activate() is dominated by the
+  // Jupyter and Colab extensions. ColabDeck reports its own duration through its exports.
   await extension.activate();
   check(`${EXTENSION_ID} activated`, extension.isActive);
+  const ownActivationMs = extension.exports?.activationMs;
+  check(
+    'activation does not block on monitoring',
+    typeof ownActivationMs === 'number' && ownActivationMs < 3_000,
+    `${ownActivationMs}ms`,
+  );
 
   const commands = await vscode.commands.getCommands(true);
   check('dashboard view contributed', commands.includes(DASHBOARD_FOCUS_COMMAND));

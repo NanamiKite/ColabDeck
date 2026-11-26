@@ -29,27 +29,19 @@ export class TerminalProbeLauncher {
       });
     }
 
-    const before = new Set(vscode.window.terminals);
     const previousBootId = await this.readPreviousBootId(paths);
     try {
       await vscode.workspace.fs.delete(paths.status, { useTrash: false });
     } catch {
       // The status file may not exist yet.
     }
-    const waiter = this.waitForTerminal(server, before);
-    try {
-      await executeColabCommand('colab.openTerminal');
-    } catch (error) {
-      waiter.cancel();
-      throw new ColabDeckError('Colab connection failed.', {
-        code: 'PROBE_LAUNCH_FAILED',
-        detail: error instanceof Error ? error.message : String(error),
-        recoverable: true,
-        action: 'RETRY',
-        cause: error,
-      });
+    // The official "Open Terminal" command is a toolbar toggle: calling it flips shared state, and
+    // the next time the user clicks the Colab button nothing opens. Reuse a terminal the user has
+    // already opened when there is one, and only drive the official command when nothing exists.
+    let terminal = this.findColabTerminal(server);
+    if (!terminal) {
+      terminal = await this.openOfficialTerminal(server);
     }
-    const terminal = await waiter.promise;
     try {
       const script = `${paths.dir}/colabdeck_probe.py`;
       const log = `${paths.dir}/probe.log`;
@@ -68,6 +60,36 @@ export class TerminalProbeLauncher {
     }
     terminal.hide();
     terminal.dispose();
+  }
+
+  private findColabTerminal(server: ServerDescriptor): vscode.Terminal | null {
+    for (const terminal of vscode.window.terminals) {
+      if (terminal.exitStatus) {
+        continue;
+      }
+      if (terminal.name === server.label || terminal.name === server.id) {
+        return terminal;
+      }
+    }
+    return null;
+  }
+
+  private async openOfficialTerminal(server: ServerDescriptor): Promise<vscode.Terminal> {
+    const before = new Set(vscode.window.terminals);
+    const waiter = this.waitForTerminal(server, before);
+    try {
+      await executeColabCommand('colab.openTerminal');
+    } catch (error) {
+      waiter.cancel();
+      throw new ColabDeckError('Colab connection failed.', {
+        code: 'PROBE_LAUNCH_FAILED',
+        detail: error instanceof Error ? error.message : String(error),
+        recoverable: true,
+        action: 'RETRY',
+        cause: error,
+      });
+    }
+    return waiter.promise;
   }
 
   /**
@@ -124,6 +146,7 @@ export class TerminalProbeLauncher {
       callback();
     };
     const promise = new Promise<vscode.Terminal>((resolve, reject) => {
+      let fallback: vscode.Terminal | null = null;
       timer = setTimeout(() => {
         finish(() => {
           reject(
@@ -136,13 +159,23 @@ export class TerminalProbeLauncher {
           );
         });
       }, TERMINAL_TIMEOUT_MS);
+      // The official terminal is named after the server's own label, which is not guaranteed to
+      // equal the workspace folder name ColabDeck knows. Wait briefly for a name match, then
+      // accept whichever terminal the official command opened.
+      setTimeout(() => {
+        if (fallback && !fallback.exitStatus) {
+          finish(() => resolve(fallback as vscode.Terminal));
+        }
+      }, Math.max(0, TERMINAL_TIMEOUT_MS - 3_000));
       subscription = vscode.window.onDidOpenTerminal((terminal) => {
         if (before.has(terminal)) {
           return;
         }
         if (terminal.name === server.label || terminal.name === server.id) {
           finish(() => resolve(terminal));
+          return;
         }
+        fallback ??= terminal;
       });
     });
     return {
