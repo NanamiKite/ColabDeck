@@ -54,7 +54,7 @@ code --install-extension release/colabdeck-<version>.vsix
 ## 已知限制
 
 - 释放需要在官方对话框里确认；"自动释放"只是把对话框打开。
-- 启动采集时官方终端会短暂闪现。
 - 一次只监控一个选中的服务器。
+- 启动采集时官方终端会短暂闪现。
+- 不显示算力点余额：ColabDeck 不调用 Google 私有配额接口，也不模拟 Jupyter / Colab 私有协议。
 - GPU 温度和功耗依赖 `nvidia-smi`，个别机型返回 `[N/A]`，显示为 `—`。
-- 不调用 Google 私有计费 / 配额接口，不模拟 Jupyter / Colab 私有协议；探针只读指标，不执行任意远端命令。
