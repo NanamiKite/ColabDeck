@@ -27,7 +27,6 @@ export function registerCommands(services: CommandServices): vscode.Disposable[]
     register('colabdeck.openDashboard', () => vscode.commands.executeCommand('colabdeck.dashboard.focus')),
     register('colabdeck.refresh', async () => {
       await services.registry.refresh();
-      await services.monitoring.start(services.registry.selected());
       services.dashboard.sendSnapshot();
     }),
     register('colabdeck.stopMonitoring', () => {

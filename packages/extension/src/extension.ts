@@ -155,16 +155,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
     monitoring.onServerDisconnected(({ serverId, reason }) => idleGuard.handleServerDisconnected(serverId, reason)),
     monitoring.onError(({ error, serverId }) => errors.push(error, serverId)),
     idleGuard.onError((error) => errors.push(error, registry.currentId)),
-    registry.onDidChangeSelection(async (server) => {
-      if (server) {
-        await monitoring.start(server);
-      } else {
+    registry.onDidChangeSelection((server) => {
+      if (!server) {
         const idleServerId = idleGuard.serverId;
         monitoring.stop();
         if (idleServerId) {
           idleGuard.handleServerDisconnected(idleServerId, 'no server selected');
         }
+        return;
       }
+      void monitoring.start(server).catch((error) => {
+        logger.error(`[ColabDeck] failed to start monitoring for ${server.label}`, error);
+      });
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void registry.refresh();
@@ -198,14 +200,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
   );
 
   await registry.refresh();
-  const selected = registry.selected();
-  if (selected) {
-    // Starting the probe can wait on a terminal for up to 30s. Never block activation on it: VS Code
-    // treats a slow activate() as an unresponsive extension and may restart the host.
-    void monitoring.start(selected).catch((error) => {
-      logger.error(`[ColabDeck] failed to start monitoring for ${selected.label}`, error);
-    });
-  }
   const activationMs = Date.now() - activationStartedAt;
   logger.info(`[ColabDeck] activated in ${activationMs}ms`);
   return { activationMs };

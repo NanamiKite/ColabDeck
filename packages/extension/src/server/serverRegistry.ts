@@ -14,7 +14,7 @@ export interface PersistedServer {
 export class ServerRegistry implements vscode.Disposable {
   private servers: readonly ServerDescriptor[] = [];
   private selectedId: string | null;
-  private verification: Promise<void> | null = null;
+  private initialized = false;
   private readonly emitter = new vscode.EventEmitter<readonly ServerDescriptor[]>;
   private readonly selectionEmitter = new vscode.EventEmitter<ServerDescriptor | undefined>;
   readonly onDidChangeServers = this.emitter.event;
@@ -24,8 +24,7 @@ export class ServerRegistry implements vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     private readonly logger: Logger,
   ) {
-    const persisted = context.globalState.get<PersistedServer | undefined>(LAST_SERVER_KEY, undefined);
-    this.selectedId = persisted?.id ?? null;
+    this.selectedId = null;
   }
 
   get all(): readonly ServerDescriptor[] {
@@ -42,8 +41,8 @@ export class ServerRegistry implements vscode.Disposable {
 
   async refresh(): Promise<readonly ServerDescriptor[]> {
     const mounted = this.discoverMountedFolders();
-    const persisted = this.discoverPersisted();
-    const merged = mergeServers(mounted, persisted);
+    const previousSelectedId = this.selectedId;
+    const merged = mergeServers(mounted);
     const changed =
       merged.length !== this.servers.length ||
       merged.some((server, index) => {
@@ -60,11 +59,14 @@ export class ServerRegistry implements vscode.Disposable {
     if (this.selectedId && !merged.some((server) => server.id === this.selectedId)) {
       this.selectedId = null;
     }
-    if (!this.selectedId) {
-      this.selectedId = merged[0]?.id ?? null;
-      if (this.selectedId) {
-        void this.context.globalState.update(LAST_SERVER_KEY, { id: this.selectedId, label: merged[0]?.label ?? '' });
-      }
+    if (!this.selectedId && merged.length > 0) {
+      const first = merged[0];
+      if (!first) return merged;
+      this.selectedId = first.id;
+      void this.context.globalState.update(LAST_SERVER_KEY, {
+        id: this.selectedId,
+        label: first.label,
+      });
     }
     if (changed) {
       this.logger.info(
@@ -73,9 +75,11 @@ export class ServerRegistry implements vscode.Disposable {
           .join(',')}`,
       );
       this.emitter.fire(merged);
-      this.selectionEmitter.fire(this.selected());
+      if (this.initialized && previousSelectedId !== this.selectedId) {
+        this.selectionEmitter.fire(this.selected());
+      }
     }
-    this.verifyRememberedServer(mounted);
+    this.initialized = true;
     return merged;
   }
 
@@ -103,22 +107,6 @@ export class ServerRegistry implements vscode.Disposable {
     }
   }
 
-  /**
-   * A freshly assigned runtime needs a moment before its Jupyter Contents API answers. Give the
-   * remembered id a few short tries before deciding it is gone.
-   */
-  private async waitForServer(serverId: string, attempts = 3, delayMs = 1_000): Promise<boolean> {
-    for (let attempt = 1; attempt <= attempts; attempt += 1) {
-      if (await this.validateServer(serverId)) {
-        return true;
-      }
-      if (attempt < attempts) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
-    return false;
-  }
-
   private discoverMountedFolders(): ServerDescriptor[] {
     const folders = vscode.workspace.workspaceFolders ?? [];
     return folders
@@ -133,59 +121,7 @@ export class ServerRegistry implements vscode.Disposable {
       }));
   }
 
-  /**
-   * The remembered server is only a hint. Runtime ids change whenever a server is released or
-   * reassigned, and the official extension removes the stale workspace folder on its side, so a
-   * remembered id that nothing else lists is usually dead. Only keep it while the official
-   * colab:// provider still resolves it; otherwise drop it so the dashboard shows a clean
-   * "no server" state instead of auto-starting monitoring against a ghost.
-   */
-  private discoverPersisted(): ServerDescriptor[] {
-    const persisted = this.context.globalState.get<PersistedServer | undefined>(LAST_SERVER_KEY, undefined);
-    if (!persisted?.id) {
-      return [];
-    }
-    return [
-      {
-        id: persisted.id,
-        label: persisted.label || `Colab ${abbreviateId(persisted.id)}`,
-        source: 'persisted',
-        notebookUri: null,
-        jupyterBaseUrl: null,
-        kernelApiAvailable: false,
-      },
-    ];
-  }
-
-  /**
-   * A remembered id that nothing else lists is usually a runtime that was released or reassigned.
-   * Confirm it off the activation path; if it is gone, forget it and refresh so the dashboard does
-   * not auto-start monitoring against a ghost.
-   */
-  private verifyRememberedServer(mounted: readonly ServerDescriptor[]): void {
-    const persisted = this.context.globalState.get<PersistedServer | undefined>(LAST_SERVER_KEY, undefined);
-    if (!persisted?.id || mounted.some((server) => server.id === persisted.id)) {
-      return;
-    }
-    if (this.verification) {
-      return;
-    }
-    this.verification = this.waitForServer(persisted.id)
-      .then(async (alive) => {
-        if (alive) {
-          return;
-        }
-        this.logger.warn(`[ServerRegistry] forgot unreachable server ${abbreviateId(persisted.id)}`);
-        await this.context.globalState.update(LAST_SERVER_KEY, undefined);
-        await this.refresh();
-      })
-      .finally(() => {
-        this.verification = null;
-      });
-  }
-
   dispose(): void {
-    this.verification = null;
     this.emitter.dispose();
     this.selectionEmitter.dispose();
   }

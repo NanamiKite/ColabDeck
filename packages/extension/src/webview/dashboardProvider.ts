@@ -208,7 +208,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
           return;
         case 'SELECT_SERVER':
           this.registry.select(message.serverId);
-          await this.monitoring.start(this.registry.selected());
           this.sendSnapshot();
           this.sendTelemetryBatch(this.range);
           return;
@@ -249,7 +248,11 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
             });
           }
           await vscode.commands.executeCommand('colab.mountServer');
-          const servers = await this.registry.refresh();
+          let servers = await this.registry.refresh();
+          for (let attempt = 0; attempt < 12 && servers.length === 0; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            servers = await this.registry.refresh();
+          }
           if (servers.length === 0) {
             // The official command returns silently when no runtime is assigned or the picker was dismissed.
             throw new ColabDeckError('No Colab server is mounted.', {
@@ -259,10 +262,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
               action: 'MOUNT_COLAB_SERVER',
             });
           }
-          const selected = this.registry.selected();
-          if (selected) {
-            await this.monitoring.start(selected);
-          }
+          await this.monitoring.start(this.registry.selected());
           this.sendSnapshot();
           this.sendTelemetryBatch(this.range);
           return;
