@@ -85,6 +85,7 @@ export function readConfig(): ColabDeckConfig {
 export function toDashboardSettings(config: ColabDeckConfig): import('@colabdeck/shared').DashboardSettings {
   return {
     timeRange: config.timeRange,
+    showProcesses: config.showProcesses,
     idleGuard: {
       enabled: config.idleGuard.enabled,
       thresholdPct: config.idleGuard.gpuUtilizationThresholdPct,
@@ -99,15 +100,4 @@ export function toDashboardSettings(config: ColabDeckConfig): import('@colabdeck
       launchMethod: config.launchMethod,
     },
   };
-}
-
-export function rangeToMs(range: TimeRange): number {
-  switch (range) {
-    case '15m':
-      return 15 * 60_000;
-    case '30m':
-      return 30 * 60_000;
-    case '1h':
-      return 60 * 60_000;
-  }
 }

@@ -12,7 +12,7 @@ import type {
   UiError,
   WebviewToHostMessage,
 } from '@colabdeck/shared';
-import { WEBVIEW_PROTOCOL_VERSION } from '@colabdeck/shared';
+import { timeRangeToMs, WEBVIEW_PROTOCOL_VERSION } from '@colabdeck/shared';
 
 export interface HostState {
   readonly snapshot: DashboardSnapshot | null;
@@ -26,6 +26,7 @@ export interface HostState {
   readonly toolboxResult: { readonly requestId: string; readonly result: ToolboxResult } | null;
   readonly errors: readonly UiError[];
   readonly mismatch: boolean;
+  readonly range: TimeRange | null;
 }
 
 const initialState: HostState = {
@@ -40,9 +41,14 @@ const initialState: HostState = {
   toolboxResult: null,
   errors: [],
   mismatch: false,
+  range: null,
 };
 
-function mergeSamples(current: readonly TelemetrySample[], incoming: readonly TelemetrySample[]): readonly TelemetrySample[] {
+function mergeSamples(
+  current: readonly TelemetrySample[],
+  incoming: readonly TelemetrySample[],
+  rangeMs: number | null,
+): readonly TelemetrySample[] {
   if (incoming.length === 0) {
     return current;
   }
@@ -53,7 +59,12 @@ function mergeSamples(current: readonly TelemetrySample[], incoming: readonly Te
   for (const sample of incoming) {
     bySeq.set(sample.seq, sample);
   }
-  return [...bySeq.values()].sort((left, right) => left.seq - right.seq).slice(-4000);
+  let merged = [...bySeq.values()].sort((left, right) => left.seq - right.seq);
+  if (rangeMs !== null) {
+    const cutoff = Date.now() - rangeMs;
+    merged = merged.filter((sample) => sample.timestampMs >= cutoff);
+  }
+  return merged.slice(-4000);
 }
 
 export function useHostMessenger(): {
@@ -94,10 +105,17 @@ export function useHostMessenger(): {
           setReady(true);
           return;
         case 'TELEMETRY_BATCH':
-          setState((previous) => ({ ...previous, samples: message.samples }));
+          setState((previous) => ({ ...previous, samples: message.samples, range: message.range }));
           return;
         case 'TELEMETRY_APPEND':
-          setState((previous) => ({ ...previous, samples: mergeSamples(previous.samples, [message.sample]) }));
+          setState((previous) => ({
+            ...previous,
+            samples: mergeSamples(
+              previous.samples,
+              [message.sample],
+              previous.range === null ? null : timeRangeToMs(previous.range),
+            ),
+          }));
           return;
         case 'IDLE_GUARD_STATE':
           setState((previous) => ({

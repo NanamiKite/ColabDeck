@@ -1,12 +1,13 @@
 import type { JSX } from 'preact';
 import { formatBytes } from '@colabdeck/shared';
-import type { GpuProcessView } from '@colabdeck/shared';
+import type { GpuProcessView, ToolboxResult } from '@colabdeck/shared';
 
 interface ProcessTableProps {
   readonly processes: readonly GpuProcessView[];
   readonly source: 'nvidia-smi' | 'procfs' | 'none';
   readonly warning: string | null;
   readonly connected: boolean;
+  readonly result: ToolboxResult | null;
   readonly onRefresh: () => void;
   readonly onKill: (pid: number) => void;
 }
@@ -16,9 +17,12 @@ export function ProcessTable({
   source,
   warning,
   connected,
+  result,
   onRefresh,
   onKill,
 }: ProcessTableProps): JSX.Element {
+  const killResult = result?.kind === 'KILL_PROCESS' ? result : null;
+  const refreshResult = result?.kind === 'REFRESH_PROCESSES' ? result : null;
   return (
     <div class="process-table">
       <div class="panel-head">
@@ -33,6 +37,17 @@ export function ProcessTable({
       {warning ? <p class="warning-text">{warning}</p> : null}
       {!connected ? (
         <p class="warning-text">Monitoring is disconnected; the process list may be stale.</p>
+      ) : null}
+      {killResult ? (
+        <p class={killResult.ok ? 'success-text' : 'warning-text'}>
+          {killResult.message ??
+            (killResult.alreadyDead
+              ? `Process ${killResult.pid} already exited.`
+              : `Process ${killResult.pid} stopped.`)}
+        </p>
+      ) : null}
+      {refreshResult && !refreshResult.ok ? (
+        <p class="warning-text">{refreshResult.message ?? 'Could not refresh GPU processes.'}</p>
       ) : null}
       {processes.length === 0 ? (
         <p class="muted">No GPU processes</p>

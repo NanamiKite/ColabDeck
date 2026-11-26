@@ -5,6 +5,17 @@ export const WEBVIEW_PROTOCOL_VERSION = 1 as const;
 
 export type TimeRange = '15m' | '30m' | '1h';
 
+export function timeRangeToMs(range: TimeRange): number {
+  switch (range) {
+    case '15m':
+      return 15 * 60_000;
+    case '30m':
+      return 30 * 60_000;
+    case '1h':
+      return 60 * 60_000;
+  }
+}
+
 export type ServerSource = 'kernel-api' | 'mounted-folder' | 'persisted';
 
 export interface ServerDescriptor {
@@ -135,6 +146,7 @@ export interface UiError {
 
 export interface DashboardSettings {
   readonly timeRange: TimeRange;
+  readonly showProcesses: boolean;
   readonly idleGuard: {
     readonly enabled: boolean;
     readonly thresholdPct: number;

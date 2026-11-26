@@ -42,7 +42,25 @@ export class StatusBarController implements vscode.Disposable {
     const text = this.buildText(server?.label ?? null, sample, idle.state, connection);
     this.item.text = text;
     this.item.tooltip = this.buildTooltip(server?.label ?? null, server?.id ?? null, sample, idle.state, connection);
-    this.item.backgroundColor = undefined;
+    this.item.backgroundColor = this.backgroundColorFor(idle.state.status, connection);
+  }
+
+  private backgroundColorFor(
+    status: IdleGuardView['status'],
+    connection: string,
+  ): vscode.StatusBarItem['backgroundColor'] {
+    if (status === 'ERROR') {
+      return new vscode.ThemeColor('statusBarItem.errorBackground');
+    }
+    if (
+      status === 'COUNTDOWN_WARNING' ||
+      status === 'TERMINATING' ||
+      connection === 'stale' ||
+      connection === 'error'
+    ) {
+      return new vscode.ThemeColor('statusBarItem.warningBackground');
+    }
+    return undefined;
   }
 
   dispose(): void {
@@ -76,7 +94,7 @@ export class StatusBarController implements vscode.Disposable {
     const total = aggregate?.memoryTotalBytes ?? null;
     const vram = used !== null && total !== null ? `${formatBytesShort(used)}/${formatBytesShort(total)}` : '—';
     const stale = connection === 'stale' ? ' | OUT OF DATE' : '';
-    return `${shortName} | VRAM ${vram} | Idle Guard: ${this.idleLabel(idle)}${stale}`;
+    return `${shortName} | VRAM ${vram} | Idle: ${this.idleLabel(idle)}${stale}`;
   }
 
   private idleLabel(idle: IdleGuardView): string {
@@ -93,9 +111,10 @@ export class StatusBarController implements vscode.Disposable {
         return `IDLE ${formatDuration(idle.idleForMs)}`;
       case 'COUNTDOWN_WARNING': {
         const countdown = this.idleGuard.snapshot.countdown;
-        return countdown?.phase === 'expired' || countdown?.phase === 'kernel-busy'
-          ? 'RELEASE?'
-          : formatDuration(countdown?.remainingMs ?? 0);
+        if (!countdown || countdown.phase === 'expired' || countdown.phase === 'kernel-busy') {
+          return 'RELEASE?';
+        }
+        return `RELEASE ${formatDuration(countdown.remainingMs)}`;
       }
       case 'TERMINATING':
         return 'STOPPING';

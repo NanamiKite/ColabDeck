@@ -194,6 +194,7 @@ export function App(): JSX.Element {
                 post({ type: 'CLEAR_CUDA_CACHE', requestId: crypto.randomUUID() })
               }
               connected={connection === 'connected'}
+              showProcesses={settings?.showProcesses ?? true}
             />
           </div>
         </div>

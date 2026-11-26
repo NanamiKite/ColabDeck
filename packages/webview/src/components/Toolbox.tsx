@@ -18,6 +18,7 @@ interface ToolboxProps {
   readonly onScan: (path: string, maxEntries: number, maxDepth: number) => void;
   readonly onClearCudaCache: () => void;
   readonly connected: boolean;
+  readonly showProcesses: boolean;
 }
 
 export function Toolbox({
@@ -30,8 +31,9 @@ export function Toolbox({
   onScan,
   onClearCudaCache,
   connected,
+  showProcesses,
 }: ToolboxProps): JSX.Element {
-  const [tab, setTab] = useState<Tab>('processes');
+  const [tab, setTab] = useState<Tab>(showProcesses ? 'processes' : 'disk');
   const refreshProcesses = (): void => {
     if (connected) {
       onRefreshProcesses();
@@ -120,6 +122,7 @@ export function Toolbox({
           source={processSource}
           warning={processWarning}
           connected={connected}
+          result={result}
           onRefresh={onRefreshProcesses}
           onKill={onKill}
         />

@@ -1,8 +1,9 @@
 import * as fs from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
-import { ColabDeckError, WEBVIEW_PROTOCOL_VERSION } from '@colabdeck/shared';
+import { ColabDeckError, timeRangeToMs, WEBVIEW_PROTOCOL_VERSION } from '@colabdeck/shared';
 import type {
+  ColabDeckErrorAction,
   DashboardSnapshot,
   HostToWebviewMessage,
   ServerView,
@@ -12,7 +13,7 @@ import type {
 } from '@colabdeck/shared';
 import { webviewToHostMessageSchema } from '@colabdeck/shared';
 import type { ColabDeckConfig } from '../config.js';
-import { rangeToMs, toDashboardSettings } from '../config.js';
+import { toDashboardSettings } from '../config.js';
 import type { ErrorCenter } from '../errors/errorCenter.js';
 import type { IdleGuardService } from '../idleGuard/idleGuardService.js';
 import type { Logger } from '../log.js';
@@ -163,7 +164,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     this.post({
       type: 'TELEMETRY_BATCH',
       range,
-      samples: this.monitoring.getSamples(rangeToMs(range)),
+      samples: this.monitoring.getSamples(timeRangeToMs(range)),
     });
   }
 
@@ -281,7 +282,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         warning: result.warning,
       });
     } catch (error) {
-      this.pushError(this.toColabDeckError(error));
+      this.pushError(this.toColabDeckError(error, 'NONE'));
     }
   }
 
@@ -299,7 +300,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
       this.post({ type: 'TOOLBOX_RESULT', requestId, result });
       await this.refreshProcesses();
     } catch (error) {
-      this.pushError(this.toColabDeckError(error));
+      this.pushError(this.toColabDeckError(error, 'NONE'));
     }
   }
 
@@ -308,7 +309,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
       const result = await this.toolbox.scanDisk(path, maxEntries, maxDepth);
       this.post({ type: 'TOOLBOX_RESULT', requestId, result });
     } catch (error) {
-      this.pushError(this.toColabDeckError(error));
+      this.pushError(this.toColabDeckError(error, 'NONE'));
     }
   }
 
@@ -317,7 +318,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
       const result: ToolboxResult = await this.toolbox.clearCudaCache();
       this.post({ type: 'TOOLBOX_RESULT', requestId, result });
     } catch (error) {
-      this.pushError(this.toColabDeckError(error));
+      this.pushError(this.toColabDeckError(error, 'NONE'));
     }
   }
 
@@ -353,14 +354,14 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     this.view = null;
   }
 
-  private toColabDeckError(error: unknown): ColabDeckError {
+  private toColabDeckError(error: unknown, action: ColabDeckErrorAction = 'RETRY'): ColabDeckError {
     if (error instanceof ColabDeckError) {
       return error;
     }
     return new ColabDeckError(error instanceof Error ? error.message : String(error), {
       code: 'UNKNOWN',
       recoverable: true,
-      action: 'RETRY',
+      action,
       cause: error,
     });
   }
