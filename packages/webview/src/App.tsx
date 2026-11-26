@@ -98,7 +98,7 @@ export function App(): JSX.Element {
         />
       ) : (
         <div class="dashboard">
-          <section class="column">
+          <section class="column dashboard-main">
             <GpuCard latest={latest} samples={state.samples} connection={connection} />
             <div class="charts-grid">
               <MetricChart
@@ -137,26 +137,17 @@ export function App(): JSX.Element {
                 valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
               />
               <MetricChart
-                title="Disk free"
+                title="Disk used"
                 unit="GiB"
                 samples={state.samples}
-                accessor={(sample) => sample.disk.freeBytes / 1024 / 1024 / 1024}
+                accessor={(sample) => sample.disk.usedBytes / 1024 / 1024 / 1024}
                 color="#c8c8c8"
                 yMax={latest ? latest.disk.totalBytes / 1024 / 1024 / 1024 : 100}
                 valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(1)} GiB`)}
               />
-              <MetricChart
-                title="Temperature"
-                unit="°C"
-                samples={state.samples}
-                accessor={(sample) => sample.temperature.gpuC ?? sample.temperature.cpuC}
-                color="#f48771"
-                yMax={120}
-                valueFormatter={(value) => (value === null ? '—' : `${value.toFixed(0)} °C`)}
-              />
             </div>
           </section>
-          <aside class="column">
+          <div class="dashboard-side">
             <IdleGuardCard
               idle={idle}
               countdown={countdown}
@@ -200,7 +191,7 @@ export function App(): JSX.Element {
               }
               connected={connection === 'connected'}
             />
-          </aside>
+          </div>
         </div>
       )}
     </div>

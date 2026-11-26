@@ -41,7 +41,7 @@ export function MetricChart({
       width,
       height: 128,
       padding: [8, 8, 4, 4],
-      scales: { x: { time: true }, y: { range: [0, yMax ?? 100] } },
+      scales: { x: { time: true }, y: yMax === undefined ? {} : { range: [0, yMax] } },
       axes: [
         {
           show: true,

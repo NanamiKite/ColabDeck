@@ -61,7 +61,9 @@ export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Elem
             </div>
             <div class="metric">
               <span class="metric-label">GPU temp</span>
-              <span class="metric-value">{aggregate.temperatureC === null ? '—' : `${aggregate.temperatureC.toFixed(0)} °C`}</span>
+              <span class={`metric-value${aggregate.temperatureC !== null && aggregate.temperatureC >= 85 ? ' hot' : ''}`}>
+                {aggregate.temperatureC === null ? '—' : `${aggregate.temperatureC.toFixed(0)} °C`}
+              </span>
             </div>
             <div class="metric">
               <span class="metric-label">Power</span>
@@ -75,7 +77,7 @@ export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Elem
           <Bar value={aggregate.utilizationPct} max={100} label="GPU utilization" />
           <Bar value={aggregate.memoryUsedBytes} max={aggregate.memoryTotalBytes} label="VRAM" />
           <Bar value={latest?.ram.usedBytes ?? null} max={latest?.ram.totalBytes ?? null} label="System RAM" />
-          <Bar value={latest?.disk.freeBytes ?? null} max={latest?.disk.totalBytes ?? null} label="Disk free" />
+          <Bar value={latest?.disk.usedBytes ?? null} max={latest?.disk.totalBytes ?? null} label="Disk used" />
         </>
       ) : (
         <p class="muted">{emptyMessage}</p>
