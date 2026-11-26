@@ -24,6 +24,13 @@ function readCssVar(name: string, fallback: string): string {
   return value.length > 0 ? value : fallback;
 }
 
+// Below this width the plot area would collapse after the y-axis and padding.
+const MIN_CHART_WIDTH = 120;
+
+function chartWidth(container: HTMLElement): number {
+  return Math.max(MIN_CHART_WIDTH, container.clientWidth);
+}
+
 export function MetricChart({
   title,
   unit,
@@ -51,7 +58,7 @@ export function MetricChart({
     if (!container) {
       return;
     }
-    const width = Math.max(220, container.clientWidth);
+    const width = chartWidth(container);
     const seriesColor = themeColor ? readCssVar(themeColor, color) : color;
     const axisColor = readCssVar('--vscode-descriptionForeground', '#6b7280');
     const gridColor = readCssVar('--vscode-charts-lines', 'rgba(128,128,128,0.18)');
@@ -118,7 +125,7 @@ export function MetricChart({
     const hideTooltip = (): void => tooltipRef.current?.classList.remove('visible');
     container.addEventListener('mouseleave', hideTooltip);
     const observer = new ResizeObserver(() => {
-      const nextWidth = Math.max(220, container.clientWidth);
+      const nextWidth = chartWidth(container);
       chart.setSize({ width: nextWidth, height: 128 });
     });
     observer.observe(container);

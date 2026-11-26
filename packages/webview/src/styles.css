@@ -100,6 +100,16 @@ body {
   flex: 1;
 }
 
+/* The server picker lists long notebook names; let it shrink to the sidebar instead of overflowing. */
+.header-controls .field {
+  min-width: 0;
+}
+
+.header-controls select {
+  width: 100%;
+  min-width: 0;
+}
+
 select,
 input {
   background: var(--cd-input);
@@ -771,6 +781,25 @@ tr:last-child td {
 @container (max-width: 480px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Below ~270px of sidebar the two-column readings wrap mid-value; stack them instead. */
+@container (max-width: 220px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 260px) {
+  .app {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .card,
+  .chart-card {
+    padding: 8px;
   }
 }
 
