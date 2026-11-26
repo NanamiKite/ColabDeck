@@ -1,0 +1,85 @@
+import type { JSX } from 'preact';
+import { computeWindowPeakMemory, formatBytes, formatPercent } from '@colabdeck/shared';
+import type { TelemetrySample } from '@colabdeck/shared';
+
+interface GpuCardProps {
+  readonly latest: TelemetrySample | null;
+  readonly samples: readonly TelemetrySample[];
+  readonly connection: string;
+}
+
+function Bar({ value, max, label }: { readonly value: number | null; readonly max: number | null; readonly label: string }): JSX.Element {
+  const percent = value !== null && max !== null && max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div class="bar-row">
+      <div class="bar-label">
+        <span>{label}</span>
+        <span>{formatPercent(percent, 0)}</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export function GpuCard({ latest, samples, connection }: GpuCardProps): JSX.Element {
+  const aggregate = latest?.gpuAggregate ?? null;
+  const peak = computeWindowPeakMemory(samples);
+  const connectionLabel: Readonly<Record<string, string>> = {
+    connected: 'Connected',
+    syncing: 'Starting',
+    stale: 'Out of date',
+    disconnected: 'Disconnected',
+    error: 'Error',
+  };
+  return (
+    <section class="card gpu-card">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">Accelerator</div>
+          <h2>{aggregate?.shortName ?? 'No GPU detected'}</h2>
+        </div>
+        <span class={`badge ${connection}`}>{connectionLabel[connection] ?? 'Unknown'}</span>
+      </div>
+      {aggregate ? (
+        <>
+          <div class="metric-grid">
+            <div class="metric">
+              <span class="metric-label">GPU util</span>
+              <span class="metric-value">{formatPercent(aggregate.utilizationPct)}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">VRAM</span>
+              <span class="metric-value">
+                {formatBytes(aggregate.memoryUsedBytes)} / {formatBytes(aggregate.memoryTotalBytes)}
+              </span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Window peak</span>
+              <span class="metric-value">{formatBytes(peak)}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">GPU temp</span>
+              <span class="metric-value">{aggregate.temperatureC === null ? '—' : `${aggregate.temperatureC.toFixed(0)} °C`}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Power</span>
+              <span class="metric-value">{aggregate.powerWatts === null ? '—' : `${aggregate.powerWatts.toFixed(0)} W`}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">CPU load</span>
+              <span class="metric-value">{latest ? `${latest.cpu.load1.toFixed(2)} / ${latest.cpu.count}` : '—'}</span>
+            </div>
+          </div>
+          <Bar value={aggregate.utilizationPct} max={100} label="GPU utilization" />
+          <Bar value={aggregate.memoryUsedBytes} max={aggregate.memoryTotalBytes} label="VRAM" />
+          <Bar value={latest?.ram.usedBytes ?? null} max={latest?.ram.totalBytes ?? null} label="System RAM" />
+          <Bar value={latest?.disk.freeBytes ?? null} max={latest?.disk.totalBytes ?? null} label="Disk free" />
+        </>
+      ) : (
+        <p class="muted">Waiting for GPU telemetry…</p>
+      )}
+    </section>
+  );
+}

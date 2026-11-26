@@ -1,0 +1,20 @@
+{
+  "name": "@colabdeck/webview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@colabdeck/shared": "*",
+    "preact": "^10.26.2",
+    "uplot": "^1.6.31"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}
