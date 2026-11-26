@@ -5,6 +5,10 @@
   "publisher": "nanami",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NanamiKite/ColabDeck.git"
+  },
   "icon": "resources/icon.png",
   "license": "UNLICENSED",
   "engines": {

@@ -22,7 +22,8 @@
     "test:probe": "python3 -m pytest packages/probe -q",
     "test:smoke": "npm run build && node scripts/smoke.mjs",
     "sync:probe": "node scripts/sync-probe.mjs",
-    "package:vsix": "npm run build && cd packages/extension && npx --yes @vscode/vsce package --allow-missing-repository --no-dependencies"
+    "package:vsix": "node scripts/package-vsix.mjs",
+    "publish:vsix": "node scripts/publish-vsix.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

@@ -17,6 +17,7 @@ __pycache__/
 .aws/
 .codex/
 coverage/
+release/
 .nyc_output/
 .eslintcache
 .cache/
