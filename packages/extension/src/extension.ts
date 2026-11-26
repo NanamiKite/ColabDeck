@@ -5,6 +5,7 @@ import { registerCommands } from './commands/index.js';
 import { ErrorCenter } from './errors/errorCenter.js';
 import { IdleGuardService } from './idleGuard/idleGuardService.js';
 import { KernelClient } from './jupyter/kernelClient.js';
+import { KernelLauncher } from './jupyter/kernelLauncher.js';
 import { Logger } from './log.js';
 import { ProbeCommandClient } from './probe/commandClient.js';
 import { ProbeInstaller } from './probe/installer.js';
@@ -27,7 +28,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const launcher = new TerminalProbeLauncher(logger);
   const commandClient = new ProbeCommandClient(logger);
   const kernelClient = new KernelClient(logger);
-  const monitoring = new MonitoringService(logger, registry, installer, launcher, commandClient, store, () => config);
+  const kernelLauncher = new KernelLauncher(logger, kernelClient);
+  const monitoring = new MonitoringService(
+    logger,
+    registry,
+    installer,
+    launcher,
+    kernelLauncher,
+    commandClient,
+    store,
+    () => config,
+  );
   const errors = new ErrorCenter();
 
   const idleGuard = new IdleGuardService(

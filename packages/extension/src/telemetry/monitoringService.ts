@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ColabDeckError, toTelemetrySample } from '@colabdeck/shared';
 import type { ProbeView, ServerDescriptor, TelemetrySample } from '@colabdeck/shared';
 import { readConfig, type ColabDeckConfig } from '../config.js';
+import type { KernelLauncher } from '../jupyter/kernelLauncher.js';
 import type { Logger } from '../log.js';
 import { ProbeCommandClient } from '../probe/commandClient.js';
 import { ProbeInstaller } from '../probe/installer.js';
@@ -70,6 +71,7 @@ export class MonitoringService implements vscode.Disposable {
     private readonly registry: ServerRegistry,
     private readonly installer: ProbeInstaller,
     private readonly launcher: TerminalProbeLauncher,
+    private readonly kernelLauncher: KernelLauncher,
     private readonly commandClient: ProbeCommandClient,
     private readonly store: TelemetryStore,
     private readonly configProvider: () => ColabDeckConfig,
@@ -139,7 +141,7 @@ export class MonitoringService implements vscode.Disposable {
     try {
       this.paths = buildProbePaths(server.id, this.configProvider().probeDir);
       await this.installer.install(server, this.paths);
-      await this.launcher.launch(server, this.paths, this.configProvider().sampleIntervalMs);
+      await this.launchProbe(server, this.paths);
       this.store.clear(server.id);
       this.resetEmitter.fire(server.id);
       this.reader = new ProbeReader(this.paths, this.logger);
@@ -416,7 +418,7 @@ export class MonitoringService implements vscode.Disposable {
     this.fireStatus();
     try {
       await this.installer.install(server, this.paths);
-      await this.launcher.launch(server, this.paths, this.configProvider().sampleIntervalMs);
+      await this.launchProbe(server, this.paths);
       this.store.clear(server.id);
       this.resetEmitter.fire(server.id);
       this.reader = new ProbeReader(this.paths, this.logger);
@@ -431,6 +433,32 @@ export class MonitoringService implements vscode.Disposable {
       this.fireProbeLost(server.id, this.lastError.message);
       this.fireStatus();
     }
+  }
+
+  /**
+   * Picks the launch path for the configured method. "auto" prefers the notebook kernel because it
+   * never touches the official extension's terminal QuickPick, which is a toggle and misbehaves
+   * when it is driven repeatedly.
+   */
+  private async launchProbe(server: ServerDescriptor, paths: ProbePaths): Promise<void> {
+    const method = this.configProvider().launchMethod;
+    const intervalMs = this.configProvider().sampleIntervalMs;
+    if (method !== 'terminal') {
+      if (await this.kernelLauncher.isAvailable(server)) {
+        this.logger.info(`[Monitoring] launching probe from the notebook kernel for ${server.label}`);
+        await this.kernelLauncher.launch(server, paths, intervalMs);
+        return;
+      }
+      if (method === 'kernel') {
+        throw new ColabDeckError('No idle notebook kernel is available for this server.', {
+          code: 'NO_ACTIVE_COLAB_KERNEL',
+          detail: 'Start the notebook kernel, or set colabdeck.probe.launchMethod to "auto" to fall back to the terminal.',
+          recoverable: true,
+          action: 'RETRY',
+        });
+      }
+    }
+    await this.launcher.launch(server, paths, intervalMs);
   }
 
   private stopInternal(sendStop: boolean): void {
