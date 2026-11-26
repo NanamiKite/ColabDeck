@@ -12,7 +12,7 @@ import type {
   UiError,
   WebviewToHostMessage,
 } from '@colabdeck/shared';
-import { timeRangeToMs, WEBVIEW_PROTOCOL_VERSION } from '@colabdeck/shared';
+import { mergeTelemetrySamples, replaceTelemetrySamples, timeRangeToMs, WEBVIEW_PROTOCOL_VERSION } from '@colabdeck/shared';
 
 export interface HostState {
   readonly snapshot: DashboardSnapshot | null;
@@ -44,35 +44,13 @@ const initialState: HostState = {
   range: null,
 };
 
-function mergeSamples(
-  current: readonly TelemetrySample[],
-  incoming: readonly TelemetrySample[],
-  rangeMs: number | null,
-): readonly TelemetrySample[] {
-  if (incoming.length === 0) {
-    return current;
-  }
-  const bySeq = new Map<number, TelemetrySample>();
-  for (const sample of current) {
-    bySeq.set(sample.seq, sample);
-  }
-  for (const sample of incoming) {
-    bySeq.set(sample.seq, sample);
-  }
-  let merged = [...bySeq.values()].sort((left, right) => left.seq - right.seq);
-  if (rangeMs !== null) {
-    const cutoff = Date.now() - rangeMs;
-    merged = merged.filter((sample) => sample.timestampMs >= cutoff);
-  }
-  return merged.slice(-4000);
-}
-
 export function useHostMessenger(): {
   readonly state: HostState;
   readonly post: (message: WebviewToHostMessage) => void;
   readonly ready: boolean;
 } {
   const apiRef = useRef<ReturnType<typeof acquireVsCodeApi> | null>(null);
+  const serverIdRef = useRef<string | null>(null);
   const [state, setState] = useState<HostState>(initialState);
   const [ready, setReady] = useState(false);
 
@@ -95,6 +73,18 @@ export function useHostMessenger(): {
           setState((previous) => ({ ...previous, mismatch: true }));
           return;
         case 'SNAPSHOT':
+          // A snapshot belongs to one server; never carry another server's chart into it.
+          if (serverIdRef.current !== null && serverIdRef.current !== message.snapshot.selectedServerId) {
+            setState((previous) => ({
+              ...previous,
+              samples: [],
+              processes: [],
+              processSource: 'none',
+              processWarning: null,
+              toolboxResult: null,
+            }));
+          }
+          serverIdRef.current = message.snapshot.selectedServerId;
           setState((previous) => ({
             ...previous,
             snapshot: message.snapshot,
@@ -105,15 +95,20 @@ export function useHostMessenger(): {
           setReady(true);
           return;
         case 'TELEMETRY_BATCH':
-          setState((previous) => ({ ...previous, samples: message.samples, range: message.range }));
+          setState((previous) => ({
+            ...previous,
+            samples: replaceTelemetrySamples(previous.samples, message.samples),
+            range: message.range,
+          }));
           return;
         case 'TELEMETRY_APPEND':
           setState((previous) => ({
             ...previous,
-            samples: mergeSamples(
+            samples: mergeTelemetrySamples(
               previous.samples,
               [message.sample],
               previous.range === null ? null : timeRangeToMs(previous.range),
+              Date.now(),
             ),
           }));
           return;
