@@ -1,6 +1,7 @@
 import { ColabDeckError } from '@colabdeck/shared';
 import type { JupyterApiKernel, JupyterKernelService } from './api.js';
 import { findColabKernel, getJupyterKernelService } from './api.js';
+import { canRequestKernelService, type KernelServiceAccess } from './kernelAccess.js';
 import type { Logger } from '../log.js';
 
 const STATUS_CACHE_MS = 5_000;
@@ -13,25 +14,34 @@ interface KernelStatusEntry {
 export class KernelClient {
   private service: JupyterKernelService | null | undefined;
   private servicePromise: Promise<JupyterKernelService | undefined> | null = null;
+  private serviceDenied = false;
   private readonly statusCache = new Map<string, KernelStatusEntry>();
 
   constructor(private readonly logger: Logger) {}
 
-  async getService(): Promise<JupyterKernelService | undefined> {
+  async getService(mode: KernelServiceAccess = 'user'): Promise<JupyterKernelService | undefined> {
     if (this.service !== undefined) {
       return this.service ?? undefined;
+    }
+    if (!canRequestKernelService(mode)) {
+      return undefined;
+    }
+    if (this.serviceDenied) {
+      return undefined;
     }
     if (!this.servicePromise) {
       this.servicePromise = getJupyterKernelService()
         .then((service) => {
           this.service = service ?? null;
           if (!service) {
+            this.serviceDenied = true;
             this.logger.warn('[KernelClient] Jupyter Kernel API is unavailable or access was denied');
           }
           return service;
         })
         .catch((error) => {
           this.service = null;
+          this.serviceDenied = true;
           this.logger.warn('[KernelClient] failed to access Jupyter Kernel API', error);
           return undefined;
         });
@@ -44,7 +54,10 @@ export class KernelClient {
     if (cached && Date.now() - cached.atMs < STATUS_CACHE_MS) {
       return cached.status;
     }
-    const service = await this.getService();
+    // The Jupyter extension gates the Kernel API behind a publisher allow-list and shows an error
+    // message on every denied call. Idle Guard must never trigger that: only read kernel status when
+    // the service is already available, and otherwise treat it as unknown.
+    const service = await this.getService('idle-guard');
     if (!service) {
       return null;
     }
