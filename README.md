@@ -2,6 +2,8 @@
 
 A companion panel for the official Google Colab VS Code extension (`google.colab`). Watch GPU curves while a training cell runs, get a countdown when the GPU sits idle so you can release the runtime, and use a small, mostly read-only toolbox.
 
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat)](LICENSE)
+
 [Quick start](#quick-start) · [Docs](#docs) · [Configuration](docs/configuration.md) · [Known limitations](#known-limitations) · [简体中文](README.zh-CN.md)
 
 ![ColabDeck dashboard: GPU metrics and charts, the Idle Guard countdown, and the GPU process table](docs/images/dashboard.png)
@@ -60,3 +62,7 @@ The guides are written in Chinese.
 - The official terminal flashes briefly when sampling starts.
 - No compute-unit balance: ColabDeck does not call Google's private quota API or imitate Jupyter and Colab private protocols.
 - GPU temperature and power depend on `nvidia-smi`; some GPUs report `[N/A]`, shown as `—`.
+
+## License
+
+GPL-3.0-or-later. See [LICENSE](LICENSE).

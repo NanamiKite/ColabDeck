@@ -2,6 +2,8 @@
 
 官方 Google Colab VS Code 扩展（`google.colab`）的伴生面板。训练时看 GPU 曲线不卡内核，GPU 闲下来倒计时提醒你释放 runtime，再附一组以只读为主的排障工具。
 
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat)](LICENSE)
+
 [快速开始](#快速开始) · [文档](#文档) · [配置](docs/configuration.md) · [已知限制](#已知限制) · [English](README.md)
 
 ![ColabDeck Dashboard：GPU 指标与曲线、Idle Guard 倒计时、GPU 进程表](docs/images/dashboard.png)
@@ -58,3 +60,7 @@ code --install-extension release/colabdeck-<version>.vsix
 - 启动采集时官方终端会短暂闪现。
 - 不显示算力点余额：ColabDeck 不调用 Google 私有配额接口，也不模拟 Jupyter / Colab 私有协议。
 - GPU 温度和功耗依赖 `nvidia-smi`，个别机型返回 `[N/A]`，显示为 `—`。
+
+## 许可证
+
+GPL-3.0-or-later，见 [LICENSE](LICENSE)。

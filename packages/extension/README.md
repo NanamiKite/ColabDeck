@@ -21,3 +21,7 @@ Companion operations and cost-control panel for the official Google Colab VS Cod
 3. Configure thresholds in Settings → Extensions → ColabDeck.
 
 ColabDeck never calls private Google billing/quota APIs, never maintains OAuth state, and never auto-confirms the official release QuickPick.
+
+## License
+
+GPL-3.0-or-later. See `LICENSE.txt`.
