@@ -232,6 +232,14 @@ button.icon-button:hover {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* When the trailing element wraps onto its own line, keep it flush right. */
+.card-head > :last-child:not(:first-child),
+.panel-head > :last-child:not(:first-child),
+.chart-head > :last-child:not(:first-child) {
+  margin-left: auto;
 }
 
 .card h2,
@@ -732,6 +740,7 @@ tr:last-child td {
   .dashboard {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .dashboard-main {
