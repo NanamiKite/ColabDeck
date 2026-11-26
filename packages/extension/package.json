@@ -10,7 +10,7 @@
     "url": "https://github.com/NanamiKite/ColabDeck.git"
   },
   "icon": "resources/icon.png",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-or-later",
   "engines": {
     "vscode": "^1.99.3"
   },
