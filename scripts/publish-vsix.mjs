@@ -74,6 +74,9 @@ const shownPath = path.relative(root, vsix);
 if (path.basename(vsix) !== expected) {
   console.warn(`[publish-vsix] warning: ${path.basename(vsix)} does not match ${expected}; make sure it is the build you want to publish.`);
 }
+if (statSync(path.join(extensionDir, 'package.json')).mtimeMs > statSync(vsix).mtimeMs) {
+  console.warn('[publish-vsix] warning: packages/extension/package.json changed after this VSIX was built; run npm run package:vsix again.');
+}
 
 if (options.auth.length === 0 && !process.env.VSCE_PAT) {
   console.warn(
