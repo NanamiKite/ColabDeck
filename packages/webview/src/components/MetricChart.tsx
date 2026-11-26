@@ -40,7 +40,7 @@ export function MetricChart({
     const options: uPlot.Options = {
       width,
       height: 128,
-      padding: [8, 8, 4, 4],
+      padding: [8, 18, 4, 4],
       scales: { x: { time: true }, y: yMax === undefined ? {} : { range: [0, yMax] } },
       axes: [
         {
