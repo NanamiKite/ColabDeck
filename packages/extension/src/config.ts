@@ -2,11 +2,8 @@ import * as vscode from 'vscode';
 import type { IdleGuardSettings, TimeRange } from '@colabdeck/shared';
 import type { LogLevel } from './log.js';
 
-export type LaunchMethod = 'auto' | 'kernel' | 'terminal';
-
 export interface ColabDeckConfig {
   readonly sampleIntervalMs: number;
-  readonly launchMethod: LaunchMethod;
   readonly probeDir: string;
   readonly idleGuard: IdleGuardSettings;
   readonly timeRange: TimeRange;
@@ -66,7 +63,6 @@ export function readConfig(): ColabDeckConfig {
   };
   return {
     sampleIntervalMs: number(probe, 'sampleIntervalMs', 5000, 1000, 60_000),
-    launchMethod: enumeration(probe, 'launchMethod', 'auto', ['auto', 'kernel', 'terminal'] as const),
     probeDir: probe.get<string>('probeDir', '/content/.colabdeck').trim(),
     idleGuard,
     timeRange: enumeration(dashboard, 'timeRange', '30m', ['15m', '30m', '1h'] as const),
@@ -97,7 +93,6 @@ export function toDashboardSettings(config: ColabDeckConfig): import('@colabdeck
     },
     probe: {
       sampleIntervalMs: config.sampleIntervalMs,
-      launchMethod: config.launchMethod,
     },
   };
 }

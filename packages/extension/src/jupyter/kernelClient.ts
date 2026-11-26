@@ -59,14 +59,6 @@ export class KernelClient {
     }
   }
 
-  async findKernel(serverId: string): Promise<JupyterApiKernel | undefined> {
-    const service = await this.getService();
-    if (!service) {
-      return undefined;
-    }
-    return findColabKernel(service, serverId);
-  }
-
   async clearCudaCache(serverId: string): Promise<string> {
     const service = await this.getService();
     if (!service) {

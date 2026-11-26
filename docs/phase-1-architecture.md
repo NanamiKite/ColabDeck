@@ -1284,7 +1284,6 @@ export interface DashboardSettings {
   };
   readonly probe: {
     readonly sampleIntervalMs: number;
-    readonly launchMethod: 'auto' | 'kernel' | 'terminal';
   };
 }
 

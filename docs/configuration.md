@@ -7,8 +7,9 @@
 | Key | 默认 | 取值 | 说明 |
 | --- | --- | --- | --- |
 | `colabdeck.probe.sampleIntervalMs` | `5000` | 1000–60000 | 采样间隔。越小曲线越细，`metrics.jsonl` 增长越快。改动后重启采集。 |
-| `colabdeck.probe.launchMethod` | `auto` | `auto` / `kernel` / `terminal` | 探针启动方式。`auto`：notebook 内核空闲时从内核启动（需要 Jupyter Kernel API 授权），否则退到官方终端。`kernel`：只从内核启动，内核不可用就报错。`terminal`：只通过官方 `colab.openTerminal` 启动，会短暂弹出终端；该命令是开关式的，频繁触发会干扰官方扩展后续的内核选择弹窗，不建议。`kernel` 还会通过 Kernel API 把已打开的 Colab kernel 合并进服务器列表。 |
 | `colabdeck.probe.probeDir` | `/content/.colabdeck` | 绝对路径 | 探针在远端的目录，必须在 `/content` 下，不能含 `..`。改动后重启采集。 |
+
+探针通过官方命令 `colab.openTerminal` 启动：它会在后台开一个连到 runtime 的终端、发送启动命令后立即隐藏。如果工作区里已经有官方终端，ColabDeck 直接复用它，不再触发该命令。
 
 ## Idle Guard
 

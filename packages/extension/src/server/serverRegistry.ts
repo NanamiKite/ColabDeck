@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import type { ServerDescriptor } from '@colabdeck/shared';
 import { abbreviateId } from '@colabdeck/shared';
-import { getJupyterKernelService, isRecord, readColabServerHandle } from '../jupyter/api.js';
 import type { Logger } from '../log.js';
 import { mergeServers } from './merge.js';
 
@@ -15,6 +14,7 @@ export interface PersistedServer {
 export class ServerRegistry implements vscode.Disposable {
   private servers: readonly ServerDescriptor[] = [];
   private selectedId: string | null;
+  private verification: Promise<void> | null = null;
   private readonly emitter = new vscode.EventEmitter<readonly ServerDescriptor[]>;
   private readonly selectionEmitter = new vscode.EventEmitter<ServerDescriptor | undefined>;
   readonly onDidChangeServers = this.emitter.event;
@@ -40,11 +40,10 @@ export class ServerRegistry implements vscode.Disposable {
     return this.servers.find((server) => server.id === this.selectedId);
   }
 
-  async refresh(options: { readonly discoverKernelApi?: boolean } = {}): Promise<readonly ServerDescriptor[]> {
+  async refresh(): Promise<readonly ServerDescriptor[]> {
     const mounted = this.discoverMountedFolders();
-    const persisted = await this.discoverPersisted(mounted);
-    const kernelApi = options.discoverKernelApi ? await this.discoverKernelApi() : [];
-    const merged = mergeServers(mounted, kernelApi, persisted);
+    const persisted = this.discoverPersisted();
+    const merged = mergeServers(mounted, persisted);
     const changed =
       merged.length !== this.servers.length ||
       merged.some((server, index) => {
@@ -76,6 +75,7 @@ export class ServerRegistry implements vscode.Disposable {
       this.emitter.fire(merged);
       this.selectionEmitter.fire(this.selected());
     }
+    this.verifyRememberedServer(mounted);
     return merged;
   }
 
@@ -140,15 +140,9 @@ export class ServerRegistry implements vscode.Disposable {
    * colab:// provider still resolves it; otherwise drop it so the dashboard shows a clean
    * "no server" state instead of auto-starting monitoring against a ghost.
    */
-  private async discoverPersisted(mounted: readonly ServerDescriptor[]): Promise<ServerDescriptor[]> {
+  private discoverPersisted(): ServerDescriptor[] {
     const persisted = this.context.globalState.get<PersistedServer | undefined>(LAST_SERVER_KEY, undefined);
     if (!persisted?.id) {
-      return [];
-    }
-    const alreadyListed = mounted.some((server) => server.id === persisted.id);
-    if (!alreadyListed && !(await this.waitForServer(persisted.id))) {
-      this.logger.warn(`[ServerRegistry] forgot unreachable server ${abbreviateId(persisted.id)}`);
-      await this.context.globalState.update(LAST_SERVER_KEY, undefined);
       return [];
     }
     return [
@@ -163,43 +157,35 @@ export class ServerRegistry implements vscode.Disposable {
     ];
   }
 
-  private async discoverKernelApi(): Promise<ServerDescriptor[]> {
-    const service = await getJupyterKernelService();
-    if (!service?.getActiveKernels) {
-      return [];
+  /**
+   * A remembered id that nothing else lists is usually a runtime that was released or reassigned.
+   * Confirm it off the activation path; if it is gone, forget it and refresh so the dashboard does
+   * not auto-start monitoring against a ghost.
+   */
+  private verifyRememberedServer(mounted: readonly ServerDescriptor[]): void {
+    const persisted = this.context.globalState.get<PersistedServer | undefined>(LAST_SERVER_KEY, undefined);
+    if (!persisted?.id || mounted.some((server) => server.id === persisted.id)) {
+      return;
     }
-    try {
-      const kernels = await service.getActiveKernels();
-      const servers = new Map<string, ServerDescriptor>();
-      for (const kernel of kernels) {
-        const serverId = readColabServerHandle(kernel.metadata);
-        if (!serverId) {
-          continue;
+    if (this.verification) {
+      return;
+    }
+    this.verification = this.waitForServer(persisted.id)
+      .then(async (alive) => {
+        if (alive) {
+          return;
         }
-        const metadata = isRecord(kernel.metadata) ? kernel.metadata : {};
-        const kernelModel = isRecord(metadata.kernelModel) ? metadata.kernelModel : {};
-        const baseUrl = typeof metadata.baseUrl === 'string' ? metadata.baseUrl : null;
-        const label =
-          typeof kernelModel.name === 'string' && kernelModel.name.length > 0
-            ? kernelModel.name
-            : `Colab ${abbreviateId(serverId)}`;
-        servers.set(serverId, {
-          id: serverId,
-          label,
-          source: 'kernel-api',
-          notebookUri: kernel.uri.toString(),
-          jupyterBaseUrl: baseUrl,
-          kernelApiAvailable: true,
-        });
-      }
-      return [...servers.values()];
-    } catch (error) {
-      this.logger.debug('[ServerRegistry] Kernel API discovery failed', error);
-      return [];
-    }
+        this.logger.warn(`[ServerRegistry] forgot unreachable server ${abbreviateId(persisted.id)}`);
+        await this.context.globalState.update(LAST_SERVER_KEY, undefined);
+        await this.refresh();
+      })
+      .finally(() => {
+        this.verification = null;
+      });
   }
 
   dispose(): void {
+    this.verification = null;
     this.emitter.dispose();
     this.selectionEmitter.dispose();
   }

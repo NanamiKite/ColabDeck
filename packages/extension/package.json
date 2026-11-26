@@ -181,17 +181,6 @@
           "scope": "window",
           "description": "Monitoring sample interval in milliseconds."
         },
-        "colabdeck.probe.launchMethod": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "kernel",
-            "terminal"
-          ],
-          "default": "auto",
-          "scope": "window",
-          "description": "Monitoring startup method."
-        },
         "colabdeck.probe.probeDir": {
           "type": "string",
           "default": "/content/.colabdeck",
