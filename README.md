@@ -2,7 +2,7 @@
 
 A companion panel for the official Google Colab VS Code extension (`google.colab`). Watch GPU curves while a training cell runs, get a countdown when the GPU sits idle so you can release the runtime, and use a small, mostly read-only toolbox.
 
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat)](LICENSE)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-0078D4?style=flat&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=NanamiKite.colabdeck) [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat)](LICENSE)
 
 [Quick start](#quick-start) · [Docs](#docs) · [Configuration](docs/configuration.md) · [Known limitations](#known-limitations) · [简体中文](README.zh-CN.md)
 
@@ -18,7 +18,7 @@ A companion panel for the official Google Colab VS Code extension (`google.colab
 
 You need VS Code >= 1.99.3 with the official `google.colab` and `ms-toolsai.jupyter` extensions installed and signed in.
 
-1. Install ColabDeck. See *Install from source* below.
+1. Install ColabDeck from the Marketplace: open Extensions (`Ctrl+Shift+X`) and search for `ColabDeck`, or run `ext install NanamiKite.colabdeck` from the Command Palette.
 2. Assign a runtime in the official Colab extension.
 3. Open the dashboard from the Activity Bar or the status bar, then click **Mount server**. The dashboard opens in the sidebar by default and switches to two columns when you widen it.
 4. Charts start updating once the status is `connected`.
@@ -28,7 +28,7 @@ Stuck on `Starting`? Click **Refresh**. The error card has **Retry** and **View 
 <details>
 <summary><b>Install from source</b></summary>
 
-Requires Node.js >= 20 and npm >= 10. After cloning the repository:
+For development. Requires Node.js >= 20 and npm >= 10. After cloning the repository:
 
 ```bash
 npm install

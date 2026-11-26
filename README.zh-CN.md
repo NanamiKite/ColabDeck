@@ -2,7 +2,7 @@
 
 官方 Google Colab VS Code 扩展（`google.colab`）的伴生面板。训练时看 GPU 曲线不卡内核，GPU 闲下来倒计时提醒你释放 runtime，再附一组以只读为主的排障工具。
 
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat)](LICENSE)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-0078D4?style=flat&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=NanamiKite.colabdeck) [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat)](LICENSE)
 
 [快速开始](#快速开始) · [文档](#文档) · [配置](docs/configuration.md) · [已知限制](#已知限制) · [English](README.md)
 
@@ -18,7 +18,7 @@
 
 前置：VS Code >= 1.99.3，已安装并登录官方 `google.colab` 和 `ms-toolsai.jupyter`。
 
-1. 安装 ColabDeck，见下方"从源码安装"。
+1. 从 Marketplace 安装：在扩展面板（`Ctrl+Shift+X`）搜索 `ColabDeck`，或在命令面板执行 `ext install NanamiKite.colabdeck`。
 2. 在官方 Colab 扩展中分配 runtime。
 3. 点击活动栏或状态栏打开 Dashboard，点击 **Mount server**。Dashboard 默认在侧边栏打开，拖宽后呈两列布局。
 4. 状态变为 `connected` 后曲线开始更新。
@@ -28,7 +28,7 @@
 <details>
 <summary><b>从源码安装</b></summary>
 
-需要 Node.js >= 20、npm >= 10。克隆仓库后：
+开发用。需要 Node.js >= 20、npm >= 10。克隆仓库后：
 
 ```bash
 npm install
