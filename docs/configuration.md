@@ -9,7 +9,7 @@
 | `colabdeck.probe.sampleIntervalMs` | `5000` | 1000–60000 | 采样间隔。越小曲线越细，`metrics.jsonl` 增长越快。改动后重启采集。 |
 | `colabdeck.probe.probeDir` | `/content/.colabdeck` | 绝对路径 | 探针在远端的目录，必须在 `/content` 下，不能含 `..`。改动后重启采集。 |
 
-探针通过官方命令 `colab.openTerminal` 启动：它会在后台开一个连到 runtime 的终端、发送启动命令后立即隐藏。如果工作区里已经有官方终端，ColabDeck 直接复用它，不再触发该命令。
+探针通过官方命令 `colab.openTerminal` 启动：它会开一个连到 runtime 的终端并发送启动命令。若已有终端名称精确匹配当前服务器，ColabDeck 会复用它；ColabDeck 不会隐藏或销毁终端，也不会接受任意新终端作为目标。
 
 ## Idle Guard
 

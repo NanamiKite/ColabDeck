@@ -6,7 +6,7 @@ import type { ServerDescriptor } from '@colabdeck/shared';
 import type { ProbePaths } from './probePaths.js';
 import { shellQuote } from './probePathUtils.js';
 
-const TERMINAL_TIMEOUT_MS = 30_000;
+const TERMINAL_TIMEOUT_MS = 15_000;
 const STATUS_TIMEOUT_MS = 20_000;
 
 export class TerminalProbeLauncher {
@@ -30,18 +30,21 @@ export class TerminalProbeLauncher {
     }
 
     const previousBootId = await this.readPreviousBootId(paths);
+    const launchStartedAtMs = Date.now();
     try {
       await vscode.workspace.fs.delete(paths.status, { useTrash: false });
-    } catch {
-      // The status file may not exist yet.
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+        throw new ColabDeckError('Could not reset the probe status.', {
+          code: 'PROBE_WRITE_FAILED',
+          detail: error instanceof Error ? error.message : String(error),
+          recoverable: true,
+          action: 'RETRY',
+          cause: error,
+        });
+      }
     }
-    // The official "Open Terminal" command is a toolbar toggle: calling it flips shared state, and
-    // the next time the user clicks the Colab button nothing opens. Reuse a terminal the user has
-    // already opened when there is one, and only drive the official command when nothing exists.
-    let terminal = this.findColabTerminal(server);
-    if (!terminal) {
-      terminal = await this.openOfficialTerminal(server);
-    }
+    const terminal = this.findColabTerminal(server) ?? (await this.openOfficialTerminal(server));
     try {
       const script = `${paths.dir}/colabdeck_probe.py`;
       const log = `${paths.dir}/probe.log`;
@@ -52,26 +55,19 @@ export class TerminalProbeLauncher {
         `else nohup env ${env} python3 ${shellQuote(script)} </dev/null >>${shellQuote(log)} 2>&1 & fi`;
       this.logger.info(`[ProbeLauncher] starting probe on ${server.label} (${server.id.slice(0, 8)})`);
       terminal.sendText(command, true);
-      await this.waitForStatus(paths, STATUS_TIMEOUT_MS, previousBootId);
+      await this.waitForStatus(paths, STATUS_TIMEOUT_MS, previousBootId, launchStartedAtMs);
     } catch (error) {
-      terminal.hide();
-      terminal.dispose();
       throw error;
     }
-    terminal.hide();
-    terminal.dispose();
   }
 
   private findColabTerminal(server: ServerDescriptor): vscode.Terminal | null {
-    for (const terminal of vscode.window.terminals) {
-      if (terminal.exitStatus) {
-        continue;
-      }
-      if (terminal.name === server.label || terminal.name === server.id) {
-        return terminal;
-      }
-    }
-    return null;
+    return (
+      vscode.window.terminals.find(
+        (terminal) =>
+          !terminal.exitStatus && (terminal.name === server.label || terminal.name === server.id),
+      ) ?? null
+    );
   }
 
   private async openOfficialTerminal(server: ServerDescriptor): Promise<vscode.Terminal> {
@@ -90,36 +86,6 @@ export class TerminalProbeLauncher {
       });
     }
     return waiter.promise;
-  }
-
-  /**
-   * Fallback for a hung probe that no longer consumes commands. The bracket trick
-   * prevents pkill from matching its own command line.
-   */
-  async killProbe(server: ServerDescriptor, paths: ProbePaths): Promise<void> {
-    if (!(await activateColabExtension(this.logger))) {
-      return;
-    }
-    const before = new Set(vscode.window.terminals);
-    const waiter = this.waitForTerminal(server, before);
-    try {
-      await executeColabCommand('colab.openTerminal');
-    } catch (error) {
-      waiter.cancel();
-      this.logger.warn('[ProbeLauncher] could not open terminal for pkill fallback', error);
-      return;
-    }
-    let terminal: vscode.Terminal | null = null;
-    try {
-      terminal = await waiter.promise;
-      terminal.sendText(`pkill -f ${shellQuote('[c]olabdeck_probe.py')} || true`, true);
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
-    } catch (error) {
-      this.logger.warn('[ProbeLauncher] pkill fallback failed', error);
-    } finally {
-      terminal?.hide();
-      terminal?.dispose();
-    }
   }
 
   private waitForTerminal(
@@ -146,7 +112,6 @@ export class TerminalProbeLauncher {
       callback();
     };
     const promise = new Promise<vscode.Terminal>((resolve, reject) => {
-      let fallback: vscode.Terminal | null = null;
       timer = setTimeout(() => {
         finish(() => {
           reject(
@@ -159,23 +124,13 @@ export class TerminalProbeLauncher {
           );
         });
       }, TERMINAL_TIMEOUT_MS);
-      // The official terminal is named after the server's own label, which is not guaranteed to
-      // equal the workspace folder name ColabDeck knows. Wait briefly for a name match, then
-      // accept whichever terminal the official command opened.
-      setTimeout(() => {
-        if (fallback && !fallback.exitStatus) {
-          finish(() => resolve(fallback as vscode.Terminal));
-        }
-      }, Math.max(0, TERMINAL_TIMEOUT_MS - 3_000));
       subscription = vscode.window.onDidOpenTerminal((terminal) => {
         if (before.has(terminal)) {
           return;
         }
         if (terminal.name === server.label || terminal.name === server.id) {
           finish(() => resolve(terminal));
-          return;
         }
-        fallback ??= terminal;
       });
     });
     return {
@@ -200,7 +155,12 @@ export class TerminalProbeLauncher {
     }
   }
 
-  private async waitForStatus(paths: ProbePaths, timeoutMs: number, previousBootId: string | null): Promise<void> {
+  private async waitForStatus(
+    paths: ProbePaths,
+    timeoutMs: number,
+    previousBootId: string | null,
+    launchStartedAtMs: number,
+  ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     let lastError: unknown;
     while (Date.now() < deadline) {
@@ -211,6 +171,7 @@ export class TerminalProbeLauncher {
         if (
           parsed.success &&
           parsed.data.seq > 0 &&
+          parsed.data.startedAtMs >= launchStartedAtMs - 2_000 &&
           (previousBootId === null || parsed.data.bootId !== previousBootId)
         ) {
           return;

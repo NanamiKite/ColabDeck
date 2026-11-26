@@ -25,7 +25,7 @@ VRAM 另有 **Window peak**：当前时间窗内观测到的显存最大值。�
 
 ## 采集过程
 
-1. 点击 **Mount server** 后，扩展把 `colabdeck_probe.py` 写到远端 `probeDir`（默认 `/content/.colabdeck`），再调用官方命令 `colab.openTerminal`，用 `nohup` 在后台启动探针。
+1. 点击 **Mount server** 后，扩展把 `colabdeck_probe.py` 写到远端 `probeDir`（默认 `/content/.colabdeck`），再调用官方命令 `colab.openTerminal`，用 `nohup` 在后台启动探针。终端由官方扩展管理，ColabDeck 不会销毁它。
 2. 探针按 `colabdeck.probe.sampleIntervalMs`（默认 5000 ms）采样，追加到 `metrics.jsonl`，并原子覆盖 `status.json`。
 3. 宿主通过官方 `colab://` 文件系统按偏移增量读取 `metrics.jsonl`，只解析到最后一个完整换行。
 4. Webview 收到新样本后更新曲线。Webview 隐藏时宿主继续采样，恢复可见时补发快照和批量数据。
@@ -46,12 +46,12 @@ GPU 卡片顶部显示 `Last sample Xs ago`。以下任一情况会标为过期�
 - 最新样本距今超过 15 秒；
 - 连接状态为 `disconnected`、`stale` 或 `error`。
 
-样本序号超过 `colabdeck.idleGuard.staleSampleSeconds`（默认 15 秒）没有推进，宿主把连接标为 `stale`，状态栏追加 `OUT OF DATE`，并在 5 / 15 / 30 秒后自动重启探针，最多 3 次。也可以点 **Refresh**，或用头部的 **Restart probe** 立即重启。
+样本序号超过 `colabdeck.idleGuard.staleSampleSeconds`（默认 15 秒）没有推进，宿主把连接标为 `stale`，状态栏追加 `OUT OF DATE`，并停止自动恢复，避免后台打开或关闭官方终端。请用 **Refresh** 或头部的 **Restart probe** 手动恢复。
 
 ## 启动采集的前提
 
 - 官方 `colab://` 文件系统以 `/content` 为根，所以 `colabdeck.probe.probeDir` 必须是 `/content` 下的绝对路径，不能包含 `..`。
-- 启动需要官方扩展的终端功能可用（官方设置 `colab.terminal` 为开启）。官方终端会短暂可见，状态文件出现后立即隐藏并关闭。
+- 启动需要官方扩展的终端功能可用（官方设置 `colab.terminal` 为开启）。官方终端会短暂可见；ColabDeck 不会隐藏或关闭它。
 - 改动 `sampleIntervalMs` 或 `probeDir` 会重启采集。
 
 ## 诊断
