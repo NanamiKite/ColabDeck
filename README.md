@@ -59,7 +59,7 @@ The guides are written in Chinese.
 
 - Releasing the runtime still needs your confirmation in the official dialog; "automatic release" only opens that dialog.
 - Only one selected server is monitored at a time.
-- The official terminal flashes briefly when sampling starts.
+- Before starting monitoring, open the matching server terminal from the official Colab extension. ColabDeck only reuses that exact existing terminal; it never invokes `colab.openTerminal`, opens, hides, or disposes terminals automatically.
 - No compute-unit balance: ColabDeck does not call Google's private quota API or imitate Jupyter and Colab private protocols.
 - The Jupyter extension denies its Kernel API to this publisher, so ColabDeck cannot read whether the notebook kernel is busy. Idle Guard treats it as unknown and releases; the CUDA cache action is unavailable.
 - GPU temperature and power depend on `nvidia-smi`; some GPUs report `[N/A]`, shown as `—`.

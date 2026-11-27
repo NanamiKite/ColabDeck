@@ -57,7 +57,7 @@ code --install-extension release/colabdeck-<version>.vsix
 
 - 释放需要在官方对话框里确认；"自动释放"只是把对话框打开。
 - 一次只监控一个选中的服务器。
-- 启动采集时官方终端会短暂闪现。
+- 启动监控前，请先在官方 Colab 扩展中打开与服务器匹配的终端。ColabDeck 只复用这个已存在的精确匹配终端，不会自动调用 `colab.openTerminal`、打开、隐藏或销毁终端。
 - 不显示算力点余额：ColabDeck 不调用 Google 私有配额接口，也不模拟 Jupyter / Colab 私有协议。
 - Jupyter 扩展不向此发布者开放 Kernel API，ColabDeck 读不到 notebook 内核是否正忙，Idle Guard 按"未知"处理照常释放；清 CUDA 缓存功能不可用。
 - GPU 温度和功耗依赖 `nvidia-smi`，个别机型返回 `[N/A]`，显示为 `—`。
