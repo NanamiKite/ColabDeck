@@ -60,12 +60,20 @@ function runNpm(args, cwd) {
 
 const options = parseArgs(process.argv.slice(2));
 const manifest = JSON.parse(readFileSync(path.join(extensionDir, 'package.json'), 'utf8'));
+const lockfilePath = path.join(root, 'package-lock.json');
+const lockfile = JSON.parse(readFileSync(lockfilePath, 'utf8'));
+const lockedExtensionVersion = lockfile.packages?.['packages/extension']?.version;
 
 // Fail before the build, not after it.
 for (const key of ['name', 'version', 'publisher']) {
   if (typeof manifest[key] !== 'string' || manifest[key].length === 0) {
     fail(`packages/extension/package.json is missing "${key}".`);
   }
+}
+if (lockedExtensionVersion !== manifest.version) {
+  fail(
+    `packages/extension version ${manifest.version} does not match package-lock.json (${String(lockedExtensionVersion)}); run npm install --package-lock-only.`,
+  );
 }
 if (!manifest.repository) {
   console.warn('[package-vsix] warning: no "repository" in package.json; the Marketplace listing will not link to the source.');
@@ -82,6 +90,10 @@ runNpm(['run', 'build'], root);
 const probe = path.join(extensionDir, 'resources', 'probe', 'colabdeck_probe.py');
 if (!existsSync(probe)) {
   fail('packages/extension/resources/probe/colabdeck_probe.py was not synced by the build.');
+}
+const notebookProbe = path.join(extensionDir, 'resources', 'probe', 'colabdeck_notebook.py');
+if (!existsSync(notebookProbe)) {
+  fail('packages/extension/resources/probe/colabdeck_notebook.py was not synced by the build.');
 }
 
 mkdirSync(releaseDir, { recursive: true });

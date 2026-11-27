@@ -6,10 +6,10 @@
 
 | Key | 默认 | 取值 | 说明 |
 | --- | --- | --- | --- |
-| `colabdeck.probe.sampleIntervalMs` | `5000` | 1000–60000 | 采样间隔。间隔越短，`metrics.jsonl` 增长越快。 |
+| `colabdeck.probe.sampleIntervalMs` | `5000` | 1000–60000 | 两种来源的采样间隔。Mounted runtime 下 `metrics.jsonl` 增长更快；Notebook 来源在下一次 Start 时把该间隔传给私有采集器。 |
 | `colabdeck.probe.probeDir` | `/content/.colabdeck` | 绝对路径 | 探针在远端的目录，必须在 `/content` 下，不能含 `..`。 |
 
-启动新探针需要预先打开当前服务器的官方 Colab 终端，等它连上。ColabDeck 只向唯一匹配的现有官方终端发送启动命令，不会自行打开或关闭终端。探针已在采样时，可以直接接入，无需终端。
+Mounted runtime 启动新探针需要预先打开当前服务器的官方 Colab 终端，等它连上。ColabDeck 只向唯一匹配的现有官方终端发送启动命令，不会自行打开或关闭终端。探针已在采样时，可以直接接入，无需终端。Notebook 来源不使用 `probeDir` 或官方终端；它从当前 Python notebook 启动私有采集器，并在下一次 Start 时读取新的采样间隔。
 
 ## Idle Guard
 

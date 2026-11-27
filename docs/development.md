@@ -3,14 +3,14 @@
 ## 环境
 
 - Node.js >= 20，npm >= 10
-- Python >= 3.10（跑探针测试需要 pytest）
+- Python >= 3.10（跑探针测试需要 pytest；Notebook 采集器和 mounted-runtime 探针都只用标准库）
 - VS Code >= 1.99.3，已安装官方 `google.colab` 和 `ms-toolsai.jupyter`
 
 ## 常用命令
 
 ```bash
 npm install
-npm run build        # shared → webview → extension → 复制探针到 packages/extension/resources/probe
+npm run build        # shared → webview → extension → 复制两个探针到 packages/extension/resources/probe
 npm run typecheck    # 先构建 shared，再对每个 workspace 执行 tsc --noEmit
 npm test             # shared + extension 的 Vitest，然后 packages/probe 的 pytest
 npm run test:smoke   # 构建后在桌面版 VS Code 里加载扩展，检查激活
@@ -43,10 +43,10 @@ VS Code 1.146.0 + js-debug 1.140.1 下，js-debug 在扩展宿主 inspector 初�
 
 ## 打包 VSIX
 
-`npm run package:vsix` 先执行 `npm run build`，再用 `@vscode/vsce` 打包到 `release/colabdeck-<version>.vsix`。打包前检查 `publisher`、`repository`、`icon`、`README.md`、`LICENSE.txt` 和构建同步出来的探针文件，缺任何一个直接退出，不等到构建完才失败。
+`npm run package:vsix` 先执行 `npm run build`，再用 `@vscode/vsce` 打包到 `release/colabdeck-<version>.vsix`。打包前检查 `publisher`、`repository`、`icon`、`README.md`、`LICENSE.txt` 和构建同步出来的两个探针文件（`colabdeck_probe.py`、`colabdeck_notebook.py`），缺任何一个直接退出，不等到构建完才失败。
 
 - `--no-dependencies`：扩展由 esbuild 打包成 `dist/extension.js`，VSIX 里不放 `node_modules`。
-- VSIX 内容由 `packages/extension/.vscodeignore` 控制：排除 `src/`、`*.map`、`smoke/`，保留 `dist/`、`resources/`（含探针）、`README.md`、`LICENSE.txt`。
+- VSIX 内容由 `packages/extension/.vscodeignore` 控制：排除 `src/`、`*.map`、`smoke/`，保留 `dist/`、`resources/`（含两个探针）、`README.md`、`LICENSE.txt`。
 - `--pre-release` 打成预发布包。Marketplace 不接受 `0.1.0-beta` 这类 semver 预发布版本号，预发布只能靠这个标记。
 
 本机安装验证：`code --install-extension release/colabdeck-<version>.vsix`。
@@ -70,8 +70,8 @@ PAT 的 Organization 选 All accessible organizations，Scopes 选 Marketplace �
 
 每次发布：
 
-1. 把 `packages/extension/package.json` 的 `version` 改成新版本。Marketplace 不接受重复版本。
-2. `npm run package:vsix`，先用 VSIX 本地装一遍。
+1. 把 `packages/extension/package.json` 的 `version` 改成新版本，并让 `package-lock.json` 的 `packages/extension.version` 保持一致（可运行 `npm install --package-lock-only`）。Marketplace 不接受重复版本；根目录和私有 workspace 的版本不是 Marketplace 版本。
+2. `npm run test`，再运行 `npm run package:vsix`；用生成的 VSIX 本地安装一遍，分别检查 **Notebook** 与 **Mounted runtime** 来源。
 3. `npm run publish:vsix`。脚本默认取 `release/` 里最新的 VSIX，也可以显式传路径；发布前列出 `publisher.name`、版本和目标页面，确认后才执行。`--yes` 跳过确认，非交互环境必须带它。
 4. 到 <https://marketplace.visualstudio.com/items?itemName=NanamiKite.colabdeck> 确认，并用 `code --install-extension NanamiKite.colabdeck` 装一次。
 
@@ -80,11 +80,11 @@ PAT 的 Organization 选 All accessible organizations，Scopes 选 Marketplace �
 ```text
 packages/
   shared/      协议类型与 zod 校验、RingBuffer、下采样、Idle Guard 纯 reducer
-  probe/       colabdeck_probe.py（仅标准库，运行在 Colab runtime）与 pytest
+  probe/       colabdeck_probe.py（挂载服务器）、colabdeck_notebook.py（Notebook 来源，均仅标准库）与 pytest
   extension/   Extension Host：服务器发现、探针安装与启动、增量读取、状态栏、Webview 宿主、Idle Guard 服务、工具箱
   webview/     Preact + uPlot Dashboard
 scripts/
-  sync-probe.mjs    把 packages/probe/colabdeck_probe.py 复制到 packages/extension/resources/probe
+  sync-probe.mjs    把两个 packages/probe/*.py 探针复制到 packages/extension/resources/probe
   smoke.mjs         桌面版 VS Code 激活冒烟测试
   package-vsix.mjs  构建并打包 VSIX 到 release/
   publish-vsix.mjs  把 VSIX 发布到 Marketplace
@@ -96,7 +96,9 @@ scripts/
 
 | 要改什么 | 位置 |
 | --- | --- |
-| 探针采样、命令处理 | `packages/probe/colabdeck_probe.py` |
+| 挂载服务器探针采样、命令处理 | `packages/probe/colabdeck_probe.py` |
+| Notebook 后台采样与租约 | `packages/probe/colabdeck_notebook.py` |
+| Notebook kernel 执行与同步 | `packages/extension/src/jupyter/notebookExecution.ts`、`notebookMonitoringService.ts` |
 | 探针文件协议、Webview 消息 | `packages/shared/src/protocol/` |
 | Idle Guard 状态机 | `packages/shared/src/idleGuard/reducer.ts`；宿主侧 `packages/extension/src/idleGuard/idleGuardService.ts` |
 | 配置读取与校验 | `packages/extension/src/config.ts`；声明在 `packages/extension/package.json` |

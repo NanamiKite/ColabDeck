@@ -1,6 +1,24 @@
 # 监控
 
-Dashboard 的指标由运行在 Colab runtime 内的采集进程（下称探针）写入文件，扩展宿主读取后推给 Webview。探针是独立进程，不经过 notebook 主内核，所以训练 cell 占用内核时曲线照常刷新。
+Dashboard 有两种采集来源：**Notebook** 和 **Mounted runtime**。面板顶部的来源切换只影响当前视图；两种来源不会共享样本或 Idle Guard 状态。
+
+## Notebook 来源
+
+Notebook 来源适用于不想挂载工作区或打开终端的场景：
+
+1. 在官方 Colab 扩展中为 `.ipynb` 选择 runtime，运行一次 cell，并确认当前 Python 内核空闲。
+2. 在 ColabDeck 中保持 **Notebook** 来源，点击 **Start monitoring**。ColabDeck 通过 Jupyter 的公开 `kernels.getKernel(uri)` 接口确认当前活动内核，然后提交一次受限辅助请求，在 runtime 内启动独立的后台采集进程。
+3. 训练 cell 运行期间，后台进程继续采样，不占用 notebook 内核的执行队列。
+4. 等内核空闲后点击 **Sync samples**。同步会提交一次短辅助请求，读取最近一批样本并更新图表；不会自动向忙碌的内核排队。
+5. 点击 **Stop** 后，采集进程退出并清理其私有目录。
+
+Notebook 采集器将有限数量的样本写入 `/tmp` 下的权限受限目录，带有 owner、进程启动时间和租约校验；停止、内核切换或 notebook 关闭会让后续同步/停止请求失效，未同步的会话也会在租约到期后自动清理。公开 `kernels.getKernel(uri)` 不提供可验证的 Colab runtime ID，因此 Notebook 来源只把用户当前选中的活动 Python kernel 作为执行目标，不显示或声称已验证 provider/runtime 身份。它不挂载工作区、不打开终端、不访问 Google 私有 API。Notebook 来源目前只显示性能卡片，不提供 Mounted runtime 的 Idle Guard、GPU 进程工具箱或磁盘扫描。
+
+如果 Jupyter Kernel API 不可用、工作区不受信任、notebook 不是 Python，或内核正在运行，Start/Sync 会给出可恢复错误；回到内核空闲后重试。Notebook 采样的历史只在当前 Dashboard 会话保留，长任务期间请定期同步。
+
+## Mounted runtime 来源
+
+Mounted runtime 来源由运行在 Colab runtime 内的 detached 采集进程（下称探针）写入文件，扩展宿主读取后推给 Webview。探针是独立进程，不经过 notebook 主内核，所以训练 cell 占用内核时曲线照常刷新。
 
 ## 显示哪些指标
 
@@ -25,7 +43,7 @@ VRAM 另有 **Window peak**：当前时间窗内观测到的显存最大值。�
 
 ## 采集过程
 
-1. 点击 **Mount server** 只挂载服务器。点击 **Start Monitoring** 后，ColabDeck 优先接入正在采样的探针。首次启动需要在官方 Colab 扩展里为当前服务器打开终端，等终端连上后点 **Retry Monitoring**。ColabDeck 将 `colabdeck_probe.py` 写入远端 `probeDir`（默认 `/content/.colabdeck`），在唯一匹配的现有官方终端中用 `nohup` 启动后台探针，不打开、隐藏或关闭终端。
+1. 切换到 **Mounted runtime**，点击 **Mount server** 只挂载服务器。点击 **Start Monitoring** 后，ColabDeck 优先接入正在采样的探针。首次启动需要在官方 Colab 扩展里为当前服务器打开终端，等终端连上后点 **Retry Monitoring**。ColabDeck 将 `colabdeck_probe.py` 写入远端 `probeDir`（默认 `/content/.colabdeck`），在唯一匹配的现有官方终端中用 `nohup` 启动后台探针，不打开、隐藏或关闭终端。
 2. 探针按 `colabdeck.probe.sampleIntervalMs`（默认 5000 ms）采样，追加到 `metrics.jsonl`，并原子覆盖 `status.json`。
 3. 宿主通过官方 `colab://` 文件系统按偏移增量读取 `metrics.jsonl`，只解析到最后一个完整换行。
 4. Webview 收到新样本后更新曲线。Webview 隐藏时宿主继续采样，恢复可见时补发快照和批量数据。
@@ -50,7 +68,7 @@ GPU 卡片顶部显示 `Last sample Xs ago`。以下任一情况会标为过期�
 
 样本序号超过 `colabdeck.idleGuard.staleSampleSeconds`（默认 15 秒）没有推进时，Idle Guard 暂停。ColabDeck 不会自动重启探针；可以点击面板头部的 **Retry Monitoring** 重新连接。如需重启探针，请在命令面板运行 `ColabDeck: Restart Monitoring`。
 
-## 启动采集的前提
+## Mounted runtime 启动前提
 
 - 官方 `colab://` 文件系统以 `/content` 为根，所以 `colabdeck.probe.probeDir` 必须是 `/content` 下的绝对路径，不能包含 `..`。
 - 启动新探针需要开启官方设置 `colab.terminal`，并手动打开与当前服务器匹配的官方终端。复用正在采样的探针不需要终端。

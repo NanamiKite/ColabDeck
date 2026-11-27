@@ -19,6 +19,15 @@
 - [ ] Dashboard 的连接状态、采样状态和错误操作可读且可操作。
 - [ ] 诊断入口可打开监控日志，且无未处理错误。
 
+## Notebook 来源
+
+- [ ] 在受信任工作区打开连接到 Colab runtime 的 Python `.ipynb`，运行一次 cell 后，Notebook 来源的 **Start Monitoring** 可用；未连接、非 Python 或不受信任工作区会给出可恢复提示。
+- [ ] Notebook 来源无需 **Mount server** 或官方终端；启动请求只在内核空闲时执行，内核忙时不会排队或打断训练 cell。
+- [ ] 训练 cell 运行期间后台采集器持续写入样本；内核空闲后 **Sync samples** 只读取新增样本，重复同步不会重复点，图表显示正确的 GPU/RAM/磁盘数据。
+- [ ] 切换到另一个 notebook、切换内核、关闭 notebook 或停止会话后，旧会话不能继续同步；Stop 失败时不会遗留无法重试的本地状态。
+- [ ] Notebook 会话目录仅位于权限受限的 `/tmp` 路径；owner PID/start-time、租约和绝对生命周期校验生效，跨 owner 读取失败关闭。
+- [ ] Notebook 来源只显示性能卡片；Idle Guard、GPU 进程工具箱和磁盘扫描仍只在 Mounted runtime 来源可用。
+
 ## 探针鲁棒性
 
 - [ ] 手动 `kill <probe pid>` 后 15s 内状态栏显示 `STALE`，并在 5/15/30s 退避后自动重启（最多 3 次）。
@@ -62,7 +71,7 @@
 | Jupyter 扩展 | 项目支持版本、最新稳定版 |
 | VS Code | 最低支持版本、当前 stable |
 | Python | 3.10、3.11、3.12 |
-| 工作区 | 单 folder、多 root、无 folder |
+| 工作区 | 单 folder、多 root、无 folder（Mounted runtime 需挂载；Notebook 需 trusted） |
 | 服务器数量 | 1、2 |
 | 探针状态 | 正常、stale、崩溃、重启、runtime 回收 |
 | Idle Guard | active、idle、countdown、cancel、snooze、release、stale、kernel busy |

@@ -9,10 +9,14 @@
 1. **官方 Colab 扩展没有可用的 `exports`。** `activate()` 返回 `undefined`，内部 `assignmentManager`、`colabApiClient`、`serverCollection` 均未导出。我们不能依赖 `extension.exports`。
 2. **官方暴露的公共集成面只有三类**：贡献命令、`colab://` 文件系统、Jupyter 扩展的公共 Kernel API；官方状态栏/树视图对第三方不可读。
 3. **推荐主通道**：通过官方 `colab://<serverId>/content/...` 文件系统写入一个独立后台探针 `colabdeck_probe.py`，复用用户已为当前服务器打开的、名称精确匹配的官方 Colab 终端发送启动命令；ColabDeck 不调用 `colab.openTerminal`，不打开、隐藏或销毁终端。探针只读写本地文件，不连接 Jupyter、不产生心跳。扩展宿主用 `workspace.fs` 轮询 `metrics.jsonl`。这条链路**不调用任何 Google 私有接口**。
-4. **可选的 Jupyter 通道**：`ms-toolsai.jupyter` 的 `getKernelService()` 可读取活动 Colab kernel 状态，并为需要主内核的可选工具提供能力；它需要用户一次性授予 Jupyter Kernel API 权限，拒绝时必须能完整降级。监控探针不从 notebook kernel 启动。
+4. **两条监控通道**：Mounted runtime 继续使用 `colab://` 文件系统和用户已打开的官方终端启动 detached 探针；Notebook 来源使用 `ms-toolsai.jupyter` 的公开 kernel API，在用户显式 Start/Sync/Stop 且内核空闲时提交受限辅助代码，启动一个不占用内核执行队列的私有后台探针。Kernel API 拒绝时必须能完整降级到 Mounted runtime。
 5. **Idle Guard 的释放需要用户确认**：ColabDeck 只调用官方释放命令并等待其结果，不模拟或自动确认官方对话框。
-6. **MVP 最小闭环**：挂载/发现 server → 写入并启动探针 → 读取 JSONL → RingBuffer → 状态栏 → Webview。这个闭环不需要 Jupyter Kernel API 授权，也不需要任何私有接口。
+6. **Mounted runtime MVP 闭环**：挂载/发现 server → 写入并启动探针 → 读取 JSONL → RingBuffer → 状态栏 → Webview。这个闭环不需要 Jupyter Kernel API 授权，也不需要任何私有接口；Notebook 来源是额外的兼容性通道，见下方当前实现补充。
 7. **明确不做**：不调用 `api/colab/resources`、`/colab/tty`、`colabApiClient`、计费/配额接口；不维护 Google OAuth；不实现保活心跳；不用主内核同步执行 `nvidia-smi`。
+
+### 0.1 当前实现补充：Notebook 来源
+
+当前版本在 Dashboard 中提供 **Notebook** 与 **Mounted runtime** 来源切换。Notebook 来源要求受信任工作区中的活动 Python notebook，并使用 `kernels.getKernel(uri)` 获取当前 kernel；该公开 API 不提供可验证的 Colab runtime ID，因此不宣称 provider 身份。用户显式点击 Start、Sync samples 或 Stop 时，才通过该 kernel 提交受限辅助代码。辅助代码只负责启动、读取或停止 `/tmp` 下的私有后台采集器，采集循环不占用 notebook 执行队列。内核忙、切换 notebook/kernel、关闭 notebook、owner 退出或租约到期时，操作 fail-closed；该来源只显示性能卡片，不提供 Mounted runtime 的 Idle Guard 和工具箱。
 
 ---
 
@@ -36,7 +40,7 @@
 | `getKernelService()` | 受授权门控 | `qI.getService()` 先检查 `apiAccess.getAccessInformation()`；拒绝则返回 `undefined` | **是**（可选，需一次性授权） |
 | `getActiveKernels()` | 公共服务方法 | 返回 `{ metadata, uri, id }[]`；远端 kernel 的 `metadata` 含 `baseUrl`、`serverProviderHandle`、`kernelModel` | **是**（自动发现） |
 | `getKernel(uri)` | 公共服务方法 | 返回 `{ metadata, connection }`；`connection.serverSettings` 为已认证的 Jupyter ServerSettings | **是**（可选隐形启动） |
-| `kernels.getKernel(uri)` | 受授权门控 | 返回 `IApiKernel`（`executeCode`、`shutdown`、`status`） | **是**（清理 CUDA 缓存等主内核动作） |
+| `kernels.getKernel(uri)` | 受授权门控 | 返回 `IApiKernel`（`executeCode`、`shutdown`、`status`） | **是**（Notebook 来源的显式辅助请求、清理 CUDA 缓存等主内核动作） |
 | `colab://` FileSystemProvider | 公共 VS Code API | scheme=`colab`，authority=serverId，path 以 `/content` 开头；走 Jupyter Contents API，带官方认证 | **是**（核心数据/命令通道） |
 | `api/colab/resources` | Colab 运行时端点 | 官方 Resources 视图使用；返回 RAM/disk/GPU 显存与利用率，但不含温度/进程 | **否**（非标准、未文档化） |
 | `/colab/tty` | Colab 运行时端点 | 官方终端 WebSocket；需要 Colab 专用认证头与协议 | **否**（不自行实现） |
@@ -177,6 +181,7 @@ colab://<serverId>/content/<path>
 | **C. 曾经发现过 server** | 不自动恢复未挂载的旧 server；只使用当前 workspace 中仍挂载的 server | 同上 | 用户先打开名称匹配的官方终端；ColabDeck 只复用该终端 | 避免对已释放 runtime 或错误终端发命令 |
 | **D. 无 server / 未登录 / 无权限** | — | — | — | 显示设置向导：打开 notebook、挂载 server、登录 Colab |
 | **E. CPU/TPU runtime** | 同上 | 可采集 RAM/disk/CPU/温度 | 同上 | Idle Guard 进入 `UNSUPPORTED`，不误释放 |
+| **F. 活动 Python Colab notebook（Notebook 来源）** | 活动 notebook URI + Jupyter kernel API；不猜 server label | 内核显式 Start 后在 runtime 私有 `/tmp` 目录写样本，Sync 时由内核读取 | Start/Sync/Stop 仅在内核空闲时提交受限辅助代码；不挂载、不打开终端 | 性能卡片与有限历史；不提供 Mounted runtime 的 Idle Guard 或工具箱 |
 
 补充：
 
@@ -197,6 +202,7 @@ colab://<serverId>/content/<path>
 8. ColabDeck 自身不产生任何 Google API 请求；探针不产生任何 Jupyter/WebSocket 连接。
 9. 官方 `colab.consumptionStatusBar` 与我们的状态栏项不重叠、不冲突。
 10. 非 trusted workspace / virtual workspace 下的行为与降级提示。
+11. Notebook 来源在内核忙、切换 notebook、切换 kernel、关闭 notebook、租约到期和 owner 退出时 fail-closed；同步不会自动排队到忙碌内核。
 
 ---
 
@@ -265,10 +271,12 @@ ColabDeck/
 │  │  │  ├─ jupyter/
 │  │  │  │  ├─ api.ts               # ms-toolsai.jupyter 的最小类型化包装
 │  │  │  │  └─ kernelClient.ts      # executeCode / shutdown（主内核动作）
+│  │  │  │  ├─ notebookExecution.ts # Notebook 来源的受限执行目标
+│  │  │  │  └─ notebookMonitoringService.ts # 启动/同步/停止私有采集器
 │  │  │  ├─ probe/
 │  │  │  │  ├─ probePaths.ts        # colab:// URI 构造与路径校验
 │  │  │  │  ├─ probeInstaller.ts    # 写入 colabdeck_probe.py
-│  │  │  │  ├─ probeLauncher.ts     # terminal / kernel 两种启动策略
+│  │  │  │  ├─ probeLauncher.ts     # Mounted runtime 官方终端启动
 │  │  │  │  ├─ probeReader.ts       # status.json + metrics.jsonl
 │  │  │  │  ├─ probeCommands.ts     # 命令文件 RPC
 │  │  │  │  └─ probeValidator.ts    # zod 校验
@@ -295,7 +303,8 @@ ColabDeck/
 │  │  └─ resources/
 │  │     ├─ icon.png
 │  │     └─ probe/
-│  │        └─ colabdeck_probe.py   # 构建时从 packages/probe 复制
+│  │        ├─ colabdeck_probe.py   # Mounted runtime；构建时从 packages/probe 复制
+│  │        └─ colabdeck_notebook.py # Notebook 来源；构建时从 packages/probe 复制
 │  ├─ webview/                      # @colabdeck/webview
 │  │  ├─ package.json
 │  │  ├─ tsconfig.json
@@ -320,6 +329,7 @@ ColabDeck/
 │  └─ probe/                        # 独立 Python 包
 │     ├─ pyproject.toml
 │     ├─ colabdeck_probe.py
+│     ├─ colabdeck_notebook.py
 │     └─ tests/
 │        ├─ test_probe.py
 │        ├─ test_commands.py
