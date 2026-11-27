@@ -74,7 +74,10 @@ export function useHostMessenger(): {
           return;
         case 'SNAPSHOT':
           // A snapshot belongs to one server; never carry another server's chart into it.
-          if (serverIdRef.current !== null && serverIdRef.current !== message.snapshot.selectedServerId) {
+          if (
+            (serverIdRef.current !== null && serverIdRef.current !== message.snapshot.selectedServerId) ||
+            message.snapshot.connection !== 'connected'
+          ) {
             setState((previous) => ({
               ...previous,
               samples: [],
