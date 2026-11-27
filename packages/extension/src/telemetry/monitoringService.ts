@@ -40,6 +40,7 @@ export class MonitoringService implements vscode.Disposable {
   private probeView: ProbeView | null = null;
   private lastError: ColabDeckError | null = null;
   private startPromise: Promise<void> | null = null;
+  private startingServerId: string | null = null;
   private operationId = 0;
   private pendingStop: Promise<boolean> | null = null;
 
@@ -88,6 +89,11 @@ export class MonitoringService implements vscode.Disposable {
   }
 
   async start(server = this.registry.selected()): Promise<void> {
+    const requestedServerId = server?.id ?? null;
+    if (this.startPromise && this.startingServerId === requestedServerId) {
+      await this.startPromise;
+      return;
+    }
     const operationId = ++this.operationId;
     while (this.startPromise) {
       await this.startPromise;
@@ -103,11 +109,13 @@ export class MonitoringService implements vscode.Disposable {
     if (this.current?.id === latestServer?.id && this.connection !== 'disconnected' && this.connection !== 'error') {
       return;
     }
+    this.startingServerId = latestServer?.id ?? null;
     this.startPromise = this.startInternal(latestServer, operationId);
     try {
       await this.startPromise;
     } finally {
       this.startPromise = null;
+      this.startingServerId = null;
     }
   }
 
@@ -218,6 +226,7 @@ export class MonitoringService implements vscode.Disposable {
 
   stop(): void {
     this.operationId += 1;
+    this.startingServerId = null;
     const server = this.current;
     this.stopInternal(true);
     this.connection = 'disconnected';
@@ -268,6 +277,7 @@ export class MonitoringService implements vscode.Disposable {
 
   dispose(): void {
     this.disposed = true;
+    this.startingServerId = null;
     this.stopInternal(true);
     this.sampleEmitter.dispose();
     this.batchEmitter.dispose();
