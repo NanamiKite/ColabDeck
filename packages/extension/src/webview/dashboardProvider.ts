@@ -19,6 +19,7 @@ import type { IdleGuardService } from '../idleGuard/idleGuardService.js';
 import type { Logger } from '../log.js';
 import type { ServerRegistry } from '../server/serverRegistry.js';
 import type { MonitoringService } from '../telemetry/monitoringService.js';
+import type { NotebookMonitoringService } from '../jupyter/notebookMonitoringService.js';
 import type { ToolboxService } from '../toolbox/toolboxService.js';
 import { activateColabExtension } from '../colabExtension.js';
 import { buildDashboardHtml } from './html.js';
@@ -34,6 +35,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     private readonly logger: Logger,
     private readonly registry: ServerRegistry,
     private readonly monitoring: MonitoringService,
+    private readonly notebookMonitoring: NotebookMonitoringService,
     private readonly idleGuard: IdleGuardService,
     private readonly errors: ErrorCenter,
     private readonly toolbox: ToolboxService,
@@ -106,6 +108,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
   sendSnapshot(): void {
     const snapshot = this.buildSnapshot();
     this.post({ type: 'SNAPSHOT', snapshot });
+    this.sendNotebookMonitor(this.notebookMonitoring.view);
     const idle = this.idleGuard.snapshot;
     this.post({
       type: 'IDLE_GUARD_STATE',
@@ -115,10 +118,18 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  sendNotebookMonitor(view: import('@colabdeck/shared').NotebookMonitorView): void {
+    this.post({ type: 'NOTEBOOK_MONITOR', view });
+  }
+
   private buildSnapshot(): DashboardSnapshot {
     const server = this.registry.selected();
     const monitoringMatches = this.monitorsSelection();
     const idle = this.idleGuard.snapshot;
+    const activeNotebook = vscode.window.activeNotebookEditor?.notebook;
+    const activeNotebookLabel = activeNotebook && !activeNotebook.isClosed && activeNotebook.notebookType === 'jupyter-notebook'
+      ? activeNotebook.uri.path.split('/').pop() ?? null
+      : null;
     return {
       protocol: WEBVIEW_PROTOCOL_VERSION,
       generatedAtMs: Date.now(),
@@ -136,6 +147,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
       countdown: idle.countdown,
       errors: this.errors.list(),
       settings: toDashboardSettings(this.configProvider()),
+      activeNotebookLabel,
     };
   }
 
@@ -287,6 +299,18 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
           this.sendTelemetryBatch(this.range);
           return;
         }
+        case 'START_NOTEBOOK_MONITORING':
+          await this.notebookMonitoring.start();
+          this.sendNotebookMonitor(this.notebookMonitoring.view);
+          return;
+        case 'SYNC_NOTEBOOK_MONITORING':
+          await this.notebookMonitoring.sync();
+          this.sendNotebookMonitor(this.notebookMonitoring.view);
+          return;
+        case 'STOP_NOTEBOOK_MONITORING':
+          await this.notebookMonitoring.stop();
+          this.sendNotebookMonitor(this.notebookMonitoring.view);
+          return;
       }
     } catch (error) {
       this.pushError(

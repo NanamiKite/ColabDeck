@@ -5,6 +5,7 @@ import { registerCommands } from './commands/index.js';
 import { ErrorCenter } from './errors/errorCenter.js';
 import { IdleGuardService } from './idleGuard/idleGuardService.js';
 import { KernelClient } from './jupyter/kernelClient.js';
+import { NotebookMonitoringService } from './jupyter/notebookMonitoringService.js';
 import { Logger } from './log.js';
 import { ProbeCommandClient } from './probe/commandClient.js';
 import { ProbeInstaller } from './probe/installer.js';
@@ -32,6 +33,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
   const launcher = new TerminalProbeLauncher(logger);
   const commandClient = new ProbeCommandClient(logger);
   const kernelClient = new KernelClient(logger);
+  const notebookMonitoring = new NotebookMonitoringService(context.extensionUri, logger, () => config);
   const monitoring = new MonitoringService(
     logger,
     registry,
@@ -114,6 +116,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
     logger,
     registry,
     monitoring,
+    notebookMonitoring,
     idleGuard,
     errors,
     toolbox,
@@ -124,6 +127,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
     registry,
     errors,
     kernelClient,
+    notebookMonitoring,
     monitoring,
     idleGuard,
     statusBar,
@@ -153,6 +157,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
     monitoring.onProbeLost(({ serverId, reason }) => idleGuard.handleProbeLost(serverId, reason)),
     monitoring.onServerDisconnected(({ serverId, reason }) => idleGuard.handleServerDisconnected(serverId, reason)),
     monitoring.onError(({ error, serverId }) => errors.push(error, serverId)),
+    notebookMonitoring.onDidChange((view) => dashboard.sendNotebookMonitor(view)),
+    vscode.window.onDidChangeActiveNotebookEditor(() => {
+      dashboard.sendSnapshot();
+    }),
     idleGuard.onError((error) => errors.push(error, registry.currentId)),
     registry.onDidChangeSelection((server) => {
       const active = monitoring.getServer();

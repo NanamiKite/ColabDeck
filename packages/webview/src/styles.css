@@ -41,6 +41,24 @@ body {
   gap: 12px;
 }
 
+.monitor-source {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.monitor-source button,
+.notebook-monitor {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.notebook-identity {
+  min-width: 0;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -370,7 +388,12 @@ button.icon-button:hover {
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 10px;
+}
+
+.charts-grid > .chart-card {
+  width: 100%;
 }
 
 .charts-grid > .chart-card:last-child:nth-child(odd) {

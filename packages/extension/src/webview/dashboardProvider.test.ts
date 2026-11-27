@@ -16,6 +16,7 @@ const { executeCommand } = vi.hoisted(() => ({ executeCommand: vi.fn(async () =>
 vi.mock('vscode', () => ({
   commands: { executeCommand },
   workspace: { getConfiguration: () => ({ get: (_key: string, fallback: unknown) => fallback }) },
+  window: { activeNotebookEditor: undefined },
   extensions: { getExtension: () => ({ activate: async () => undefined }) },
   Uri: { joinPath: () => ({ fsPath: '', toString: () => 'https://webview.example' }) },
 }));
@@ -59,11 +60,25 @@ async function dashboard() {
     registry as unknown as ServerRegistry,
     monitoring as unknown as MonitoringService,
     {
+      view: {
+        notebookLabel: null,
+        state: 'idle',
+        message: null,
+        samples: [],
+        canStart: false,
+        canSync: false,
+        canStop: false,
+      },
+      start: vi.fn(),
+      sync: vi.fn(),
+      stop: vi.fn(),
+    } as unknown as import('../jupyter/notebookMonitoringService.js').NotebookMonitoringService,
+    {
       snapshot: { state: {}, countdown: null, recentTransitions: [] },
       onChange: subscribe,
       onError: subscribe,
     } as unknown as IdleGuardService,
-    { list: () => [], onDidChange: subscribe } as unknown as ErrorCenter,
+    { list: () => [], push: vi.fn(() => null), onDidChange: subscribe } as unknown as ErrorCenter,
     {} as ToolboxService,
     () => config,
   );

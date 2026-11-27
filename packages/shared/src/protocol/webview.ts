@@ -173,6 +173,19 @@ export interface DashboardSnapshot {
   readonly countdown: CountdownView | null;
   readonly errors: readonly UiError[];
   readonly settings: DashboardSettings;
+  readonly activeNotebookLabel: string | null;
+}
+
+export type NotebookMonitorState = 'idle' | 'starting' | 'recording' | 'syncing' | 'stopping';
+
+export interface NotebookMonitorView {
+  readonly notebookLabel: string | null;
+  readonly state: NotebookMonitorState;
+  readonly message: string | null;
+  readonly samples: readonly TelemetrySample[];
+  readonly canStart: boolean;
+  readonly canSync: boolean;
+  readonly canStop: boolean;
 }
 
 export type WebviewToHostMessage =
@@ -214,6 +227,9 @@ export type WebviewToHostMessage =
   | { readonly type: 'MOUNT_COLAB_SERVER' }
   | { readonly type: 'REFRESH_SERVERS' }
   | { readonly type: 'START_MONITORING' }
+  | { readonly type: 'START_NOTEBOOK_MONITORING' }
+  | { readonly type: 'SYNC_NOTEBOOK_MONITORING' }
+  | { readonly type: 'STOP_NOTEBOOK_MONITORING' }
   | { readonly type: 'OPEN_SETTINGS' }
   | { readonly type: 'OPEN_PROBE_LOG' }
   | { readonly type: 'RETRY_PROBE' };
@@ -261,6 +277,7 @@ export type HostToWebviewMessage =
       readonly webviewProtocol: number;
     }
   | { readonly type: 'SNAPSHOT'; readonly snapshot: DashboardSnapshot }
+  | { readonly type: 'NOTEBOOK_MONITOR'; readonly view: NotebookMonitorView }
   | {
       readonly type: 'TELEMETRY_BATCH';
       readonly range: TimeRange;
@@ -380,6 +397,9 @@ export const webviewToHostMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('MOUNT_COLAB_SERVER') }).strict(),
   z.object({ type: z.literal('REFRESH_SERVERS') }).strict(),
   z.object({ type: z.literal('START_MONITORING') }).strict(),
+  z.object({ type: z.literal('START_NOTEBOOK_MONITORING') }).strict(),
+  z.object({ type: z.literal('SYNC_NOTEBOOK_MONITORING') }).strict(),
+  z.object({ type: z.literal('STOP_NOTEBOOK_MONITORING') }).strict(),
   z.object({ type: z.literal('OPEN_SETTINGS') }).strict(),
   z.object({ type: z.literal('OPEN_PROBE_LOG') }).strict(),
   z.object({ type: z.literal('RETRY_PROBE') }).strict(),

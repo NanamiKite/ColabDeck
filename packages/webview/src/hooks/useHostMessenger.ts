@@ -4,6 +4,7 @@ import type {
   DashboardSnapshot,
   GpuProcessView,
   HostToWebviewMessage,
+  NotebookMonitorView,
   IdleGuardTransitionView,
   IdleGuardView,
   TelemetrySample,
@@ -27,6 +28,7 @@ export interface HostState {
   readonly errors: readonly UiError[];
   readonly mismatch: boolean;
   readonly range: TimeRange | null;
+  readonly notebook: NotebookMonitorView | null;
 }
 
 const initialState: HostState = {
@@ -42,6 +44,7 @@ const initialState: HostState = {
   errors: [],
   mismatch: false,
   range: null,
+  notebook: null,
 };
 
 export function useHostMessenger(): {
@@ -96,6 +99,9 @@ export function useHostMessenger(): {
             errors: message.snapshot.errors,
           }));
           setReady(true);
+          return;
+        case 'NOTEBOOK_MONITOR':
+          setState((previous) => ({ ...previous, notebook: message.view }));
           return;
         case 'TELEMETRY_BATCH':
           setState((previous) => ({

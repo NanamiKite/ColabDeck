@@ -8,6 +8,7 @@ interface GpuCardProps {
   readonly samples: readonly TelemetrySample[];
   readonly connection: string;
   readonly probe: ProbeView | null;
+  readonly sampleTimeMode?: 'received' | 'sampled';
 }
 
 function Bar({ value, max, label }: { readonly value: number | null; readonly max: number | null; readonly label: string }): JSX.Element {
@@ -32,7 +33,7 @@ function Bar({ value, max, label }: { readonly value: number | null; readonly ma
   );
 }
 
-export function GpuCard({ latest, samples, connection, probe }: GpuCardProps): JSX.Element {
+export function GpuCard({ latest, samples, connection, probe, sampleTimeMode = 'received' }: GpuCardProps): JSX.Element {
   const aggregate = latest?.gpuAggregate ?? null;
   const peak = computeWindowPeakMemory(samples);
   const connected = connection === 'connected';
@@ -52,7 +53,7 @@ export function GpuCard({ latest, samples, connection, probe }: GpuCardProps): J
           <h2>{title}</h2>
         </div>
         <SampleAge
-          receivedAtMs={latest?.receivedAtMs ?? null}
+          receivedAtMs={sampleTimeMode === 'sampled' ? latest?.timestampMs ?? null : latest?.receivedAtMs ?? null}
           connected={connected}
           detail={probeDetail}
         />
