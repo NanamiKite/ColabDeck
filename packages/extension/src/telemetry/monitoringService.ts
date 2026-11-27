@@ -1,7 +1,8 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import { ColabDeckError, toTelemetrySample } from '@colabdeck/shared';
-import type { ProbeView, ServerDescriptor, TelemetrySample } from '@colabdeck/shared';
-import { readConfig, type ColabDeckConfig } from '../config.js';
+import type { ProbeStatus, ProbeView, ServerDescriptor, TelemetrySample } from '@colabdeck/shared';
+import type { ColabDeckConfig } from '../config.js';
 import type { Logger } from '../log.js';
 import { ProbeCommandClient } from '../probe/commandClient.js';
 import { ProbeInstaller } from '../probe/installer.js';
@@ -21,28 +22,28 @@ export interface MonitoringStatus {
   readonly error: ColabDeckError | null;
 }
 
-const MAX_RESTART_ATTEMPTS = 3;
-const RESTART_DELAYS_MS = [5_000, 15_000, 30_000] as const;
+interface StartOperation {
+  readonly serverId: string;
+  readonly controller: AbortController;
+  readonly promise: Promise<void>;
+}
 
 export class MonitoringService implements vscode.Disposable {
   private current: ServerDescriptor | null = null;
   private paths: ProbePaths | null = null;
+  private running: ProbeStatus | null = null;
   private reader: ProbeReader | null = null;
   private sampler: NodeJS.Timeout | null = null;
-  private restartTimer: NodeJS.Timeout | null = null;
-  private ticking = false;
+  private reading: ProbeReader | null = null;
   private disposed = false;
-  private restartAttempts = 0;
-  private lastRestartAt = 0;
   private consecutiveErrors = 0;
-  private lastSeqAdvanceAt = 0;
+  private lastSampleAtMs: number | null = null;
+  private samplingStartedAtMs = 0;
   private connection: MonitoringConnection = 'disconnected';
   private probeView: ProbeView | null = null;
   private lastError: ColabDeckError | null = null;
-  private startPromise: Promise<void> | null = null;
-  private startingServerId: string | null = null;
-  private operationId = 0;
-  private pendingStop: Promise<boolean> | null = null;
+  private operation: StartOperation | null = null;
+  private pendingStop: Promise<void> | null = null;
 
   private readonly sampleEmitter = new vscode.EventEmitter<{
     readonly server: ServerDescriptor;
@@ -83,158 +84,139 @@ export class MonitoringService implements vscode.Disposable {
       serverId: this.current?.id ?? null,
       connection: this.connection,
       probe: this.probeView,
-      lastSampleAtMs: this.lastSeqAdvanceAt || null,
+      lastSampleAtMs: this.lastSampleAtMs,
       error: this.lastError,
     };
   }
 
-  async start(server = this.registry.selected()): Promise<void> {
-    const requestedServerId = server?.id ?? null;
-    if (this.startPromise && this.startingServerId === requestedServerId) {
-      await this.startPromise;
-      return;
-    }
-    const operationId = ++this.operationId;
-    while (this.startPromise) {
-      await this.startPromise;
-    }
-    if (this.pendingStop) {
-      await this.pendingStop;
-      this.pendingStop = null;
-    }
-    const latestServer = this.registry.selected();
-    if (operationId !== this.operationId || server?.id !== latestServer?.id) {
-      return;
-    }
-    if (this.current?.id === latestServer?.id && this.connection !== 'disconnected' && this.connection !== 'error') {
-      return;
-    }
-    this.startingServerId = latestServer?.id ?? null;
-    this.startPromise = this.startInternal(latestServer, operationId);
-    try {
-      await this.startPromise;
-    } finally {
-      this.startPromise = null;
-      this.startingServerId = null;
-    }
+  start(server = this.registry.selected()): Promise<void> {
+    return this.beginStart(server, false);
   }
 
-  private async startInternal(server: ServerDescriptor | undefined, operationId: number): Promise<void> {
-    if (this.disposed) {
-      return;
+  restart(): Promise<void> {
+    return this.beginStart(this.registry.selected(), true);
+  }
+
+  private beginStart(server: ServerDescriptor | undefined, restart: boolean): Promise<void> {
+    if (this.disposed || !server || server.id !== this.registry.selected()?.id) {
+      return Promise.resolve();
     }
-    if (!server) {
-      this.stopInternal(true);
-      this.connection = 'disconnected';
-      this.probeView = null;
-      this.fireStatus();
-      return;
+    const previousOperation = this.operation;
+    if (previousOperation?.serverId === server.id && !previousOperation.controller.signal.aborted) {
+      return previousOperation.promise;
     }
-    if (operationId !== this.operationId) {
-      return;
-    }
-    if (this.current?.id === server.id && this.connection !== 'disconnected' && this.connection !== 'error') {
-      return;
+    if (!restart && this.current?.id === server.id && (this.connection === 'connected' || this.connection === 'syncing')) {
+      return Promise.resolve();
     }
     const previous = this.current;
-    const previousPaths = this.paths;
-    this.stopInternal(false);
-    if (previous && previous.id !== server.id) {
-      this.fireServerDisconnected(previous.id, 'selected server changed');
-      if (previousPaths) {
-        const stopped = await this.commandClient.stop(previous.id, previousPaths.relativeDir);
-        if (!stopped || operationId !== this.operationId) {
-          this.connection = 'error';
-          this.lastError = new ColabDeckError('The previous probe did not stop.', {
-            code: 'PROBE_STALE',
-            detail: 'ColabDeck will not start another probe until the previous one acknowledges STOP.',
-            recoverable: true,
-            action: 'RETRY',
-          });
-          this.fireError(this.lastError);
-          this.fireStatus();
-          return;
-        }
-      }
-    }
-    if (previous && previous.id === server.id && previousPaths) {
-      const stopped = await this.commandClient.stop(previous.id, previousPaths.relativeDir, 2_000);
-      if (!stopped) {
-        this.connection = 'error';
-        this.lastError = new ColabDeckError('The previous probe did not stop.', {
-          code: 'PROBE_STALE',
-          detail: 'ColabDeck will not open or dispose a terminal to kill it. Stop the probe from the existing Colab terminal, then retry.',
-          recoverable: true,
-          action: 'RETRY',
-        });
-        this.fireError(this.lastError);
-        this.fireStatus();
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
+    const previousPaths = previous?.id === server.id ? this.paths : null;
+    const pendingStop = this.pendingStop;
+    previousOperation?.controller.abort();
+    this.resetSampling();
     this.current = server;
-    this.restartAttempts = 0;
+    this.paths = null;
+    this.running = null;
     this.lastError = null;
     this.connection = 'syncing';
     this.probeView = null;
+    this.store.clear(server.id);
+    const controller = new AbortController();
+    const config = this.configProvider();
+    const promise = Promise.resolve().then(async () => {
+      try {
+        await previousOperation?.promise;
+        await pendingStop;
+        controller.signal.throwIfAborted();
+        if (this.registry.selected()?.id !== server.id) {
+          this.stop(false);
+          return;
+        }
+        await this.startInternal(server, config, restart, previousPaths, controller.signal);
+      } catch (error) {
+        if (!controller.signal.aborted && !this.disposed && this.current?.id === server.id) {
+          const failure = this.asColabDeckError(error, 'PROBE_LAUNCH_FAILED');
+          this.logger.error(`[Monitoring] could not start monitoring for ${server.label}`, error);
+          this.fail(server, failure);
+        }
+      } finally {
+        if (this.operation?.controller === controller) {
+          this.operation = null;
+        }
+      }
+    });
+    this.operation = { serverId: server.id, controller, promise };
+    if (previous && previous.id !== server.id) {
+      this.fireServerDisconnected(previous.id, 'selected server changed');
+    } else if (previous) {
+      this.fireProbeLost(previous.id, 'monitoring is starting again');
+    }
     this.fireStatus();
-    try {
-      this.paths = buildProbePaths(server.id, this.configProvider().probeDir);
-      await this.installer.install(server, this.paths);
-      if (operationId !== this.operationId) return;
-      await this.launcher.launch(server, this.paths, this.configProvider().sampleIntervalMs);
-      if (operationId !== this.operationId) return;
-      this.store.clear(server.id);
-      this.resetEmitter.fire(server.id);
-      this.reader = new ProbeReader(this.paths, this.logger);
-      this.startSampler();
-      await this.tick();
-    } catch (error) {
-      this.lastError = this.asColabDeckError(error, 'PROBE_LAUNCH_FAILED');
-      this.connection = 'error';
-      this.probeView = null;
-      this.logger.error(`[Monitoring] failed to start probe for ${server.label}`, error);
-      this.fireError(this.lastError);
-      this.fireProbeLost(server.id, this.lastError.message);
-      this.fireStatus();
-    }
+    this.resetEmitter.fire(server.id);
+    return promise;
   }
 
-  async restart(): Promise<void> {
-    const operationId = ++this.operationId;
-    if (this.restartTimer) {
-      clearTimeout(this.restartTimer);
-      this.restartTimer = null;
+  private async startInternal(
+    server: ServerDescriptor,
+    config: ColabDeckConfig,
+    restart: boolean,
+    previousPaths: ProbePaths | null,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const paths = buildProbePaths(server.id, config.probeDir);
+    this.paths = paths;
+    let status = await this.launcher.findRunningProbe(paths, signal);
+    signal.throwIfAborted();
+    if (restart || !status) {
+      this.launcher.requireTerminal(server);
+      const intervalMs = Math.round(config.sampleIntervalMs);
+      await this.installer.install(server, paths, signal);
+      signal.throwIfAborted();
+      if (restart) {
+        if (previousPaths && previousPaths.dir !== paths.dir) {
+          const old = await this.launcher.findRunningProbe(previousPaths, signal);
+          signal.throwIfAborted();
+          if (old) await this.stopProbe(previousPaths, old, signal);
+        }
+        signal.throwIfAborted();
+        if (status) await this.stopProbe(paths, status, signal);
+      }
+      signal.throwIfAborted();
+      status = await this.launcher.launch(server, paths, intervalMs, signal);
     }
-    while (this.startPromise) {
-      await this.startPromise;
-    }
-    const server = this.current ?? this.registry.selected();
-    if (!server) {
-      return;
-    }
-    this.restartAttempts = 0;
-    if (this.current?.id === server.id && this.paths) {
-      this.fireProbeLost(server.id, 'probe restarted by user');
-      await this.restartInternal(server, operationId);
-      return;
-    }
-    this.stopInternal(true);
-    await this.start(server);
+    signal.throwIfAborted();
+    this.running = status;
+    this.store.setInterval(status.sampleIntervalMs);
+    const reader = new ProbeReader(paths, this.logger);
+    this.reader = reader;
+    this.samplingStartedAtMs = Date.now();
+    this.sampler = setInterval(() => void this.tick(reader, server), status.sampleIntervalMs);
+    await this.tick(reader, server);
   }
 
-  stop(): void {
-    this.operationId += 1;
-    this.startingServerId = null;
+  stop(sendStop = true): void {
+    this.operation?.controller.abort();
     const server = this.current;
-    this.stopInternal(true);
+    const paths = this.paths;
+    const running = this.running;
+    this.resetSampling();
+    this.current = null;
+    this.paths = null;
+    this.running = null;
     this.connection = 'disconnected';
     this.probeView = null;
     this.lastError = null;
+    if (server) this.store.clear(server.id);
+    if (sendStop && paths && running) {
+      const stop = this.stopProbe(paths, running).catch((error) => {
+        this.logger.warn('[Monitoring] unable to stop the remote probe', error);
+      }).finally(() => {
+        if (this.pendingStop === stop) this.pendingStop = null;
+      });
+      this.pendingStop = stop;
+    }
     this.fireStatus();
     if (server) {
-      this.fireServerDisconnected(server.id, 'monitoring stopped by user');
+      this.fireServerDisconnected(server.id, sendStop ? 'monitoring stopped by user' : 'selected server changed');
     }
   }
 
@@ -277,8 +259,8 @@ export class MonitoringService implements vscode.Disposable {
 
   dispose(): void {
     this.disposed = true;
-    this.startingServerId = null;
-    this.stopInternal(true);
+    this.operation?.controller.abort();
+    this.resetSampling();
     this.sampleEmitter.dispose();
     this.batchEmitter.dispose();
     this.statusEmitter.dispose();
@@ -289,71 +271,54 @@ export class MonitoringService implements vscode.Disposable {
     this.errorEmitter.dispose();
   }
 
-  private startSampler(): void {
-    this.stopSampler();
-    const interval = this.configProvider().sampleIntervalMs;
-    this.sampler = setInterval(() => void this.tick(), interval);
-  }
-
-  private stopSampler(): void {
+  private resetSampling(): void {
     if (this.sampler) {
       clearInterval(this.sampler);
       this.sampler = null;
     }
+    this.reader = null;
+    this.consecutiveErrors = 0;
+    this.lastSampleAtMs = null;
+    this.samplingStartedAtMs = 0;
   }
 
-  private async tick(): Promise<void> {
-    if (this.disposed || !this.reader || !this.current || !this.paths) {
-      return;
-    }
-    if (this.ticking) {
-      return;
-    }
-    this.ticking = true;
-    const server = this.current;
+  private async tick(reader: ProbeReader, server: ServerDescriptor): Promise<void> {
+    const isCurrent = (): boolean =>
+      !this.disposed && this.reader === reader && this.registry.selected()?.id === server.id;
+    if (!isCurrent() || this.reading === reader) return;
+    this.reading = reader;
     try {
-      const result = await this.reader.read();
-      if (this.current?.id !== server.id) {
+      const result = await reader.read();
+      if (!isCurrent()) return;
+      this.consecutiveErrors = 0;
+      if (result.status.state === 'stopping') {
+        this.running = null;
+        this.fail(server, new ColabDeckError('The monitoring probe has stopped.', {
+          code: 'PROBE_STALE', action: 'RETRY',
+        }), 'stale');
         return;
       }
       if (result.reset) {
         this.store.clear(server.id);
-        this.resetEmitter.fire(server.id);
       }
       const now = Date.now();
-      if (result.samples.length > 0) {
-        if (this.connection !== 'connected') {
-          this.connection = 'connected';
-          this.connectedEmitter.fire(server);
-        }
-        this.lastSeqAdvanceAt = now;
-        this.consecutiveErrors = 0;
-        if (now - this.lastRestartAt > 5 * 60_000) {
-          this.restartAttempts = 0;
-        }
-        const telemetrySamples: TelemetrySample[] = [];
-        for (const sample of result.samples) {
-          const telemetry = toTelemetrySample(sample, now);
-          this.store.append(server.id, telemetry);
-          this.sampleEmitter.fire({ server, sample: telemetry });
-          telemetrySamples.push(telemetry);
-        }
-        if (telemetrySamples.length > 0) {
-          this.batchEmitter.fire({ server, samples: telemetrySamples });
-        }
-        this.lastError = null;
+      this.running = result.status;
+      const staleMs = Math.max(this.configProvider().idleGuard.staleSampleMs, 2 * result.status.sampleIntervalMs);
+      const telemetry = result.samples.map((sample) => toTelemetrySample(sample, now));
+      for (const sample of telemetry) this.store.append(server.id, sample);
+      const latest = telemetry[telemetry.length - 1];
+      if (latest && now - latest.timestampMs <= staleMs && result.status.state === 'running') {
+        this.lastSampleAtMs = now;
       }
-      if (this.lastSeqAdvanceAt === 0 && result.status.seq > 0) {
-        this.lastSeqAdvanceAt = now;
-      }
-      const stale = this.configProvider().idleGuard.staleSampleMs;
-      if (
-        result.samples.length === 0 &&
-        this.lastSeqAdvanceAt > 0 &&
-        now - this.lastSeqAdvanceAt > stale
-      ) {
-        this.handleStale(server);
+      if (now - (this.lastSampleAtMs ?? this.samplingStartedAtMs) > staleMs) {
+        this.fail(server, new ColabDeckError('Monitoring stopped receiving fresh samples.', {
+          code: 'PROBE_STALE', action: 'RETRY',
+        }), 'stale');
         return;
+      }
+      if (this.lastSampleAtMs === now && this.connection !== 'connected') {
+        this.connection = 'connected';
+        this.connectedEmitter.fire(server);
       }
       this.probeView = {
         pid: result.status.pid,
@@ -362,170 +327,57 @@ export class MonitoringService implements vscode.Disposable {
         lastSampleAtMs: result.status.lastSampleAtMs,
         lastReceivedAtMs: now,
         sampleIntervalMs: result.status.sampleIntervalMs,
-        status: this.connection === 'connected' ? 'running' : this.connection === 'stale' ? 'stale' : this.connection === 'error' ? 'error' : 'starting',
+        status: this.connection === 'connected' ? 'running' : 'starting',
       };
-      if (this.connection === 'stale') {
-        this.connection = 'connected';
-        this.connectedEmitter.fire(server);
+      this.fireStatus();
+      if (result.reset || telemetry.length > 1) this.resetEmitter.fire(server.id);
+      if (latest && this.lastSampleAtMs === now) {
+        this.sampleEmitter.fire({ server, sample: latest });
+        this.batchEmitter.fire({ server, samples: telemetry });
       }
-      this.fireStatus();
     } catch (error) {
-      await this.handleReadError(server, error);
+      if (!isCurrent()) return;
+      const failure = this.asColabDeckError(error, 'PROBE_STALE');
+      const staleMs = Math.max(this.configProvider().idleGuard.staleSampleMs, 2 * (this.running?.sampleIntervalMs ?? 0));
+      if (++this.consecutiveErrors >= 3 || Date.now() - (this.lastSampleAtMs ?? this.samplingStartedAtMs) > staleMs) {
+        this.fail(server, failure, failure.code === 'PROBE_PROTOCOL_MISMATCH' ? 'error' : 'stale');
+      } else {
+        this.logger.debug(`[Monitoring] transient read error for ${server.label}`, error);
+      }
     } finally {
-      this.ticking = false;
+      if (this.reading === reader) this.reading = null;
     }
   }
 
-  private handleStale(server: ServerDescriptor): void {
-    if (this.connection === 'stale' || this.connection === 'disconnected' || this.connection === 'error') {
-      return;
-    }
-    this.connection = 'stale';
-    if (this.probeView) {
-      this.probeView = { ...this.probeView, status: 'stale' };
-    }
-    this.fireProbeLost(server.id, 'probe samples became stale');
-    this.fireStatus();
-    this.scheduleRestart(server);
-  }
-
-  private async handleReadError(server: ServerDescriptor, error: unknown): Promise<void> {
-    this.consecutiveErrors += 1;
-    if (this.consecutiveErrors < 3) {
-      this.logger.debug(`[Monitoring] transient read error for ${server.label}`, error);
-      return;
-    }
-    const colabDeckError = this.asColabDeckError(error, 'PROBE_STALE');
-    const alive = await this.registry.validateServer(server.id);
-    if (this.current?.id !== server.id) {
-      return;
-    }
-    if (!alive) {
-      this.connection = 'disconnected';
-      this.probeView = null;
-      this.stopSampler();
-      this.lastError = colabDeckError;
-      this.fireServerDisconnected(server.id, 'Colab server is no longer reachable');
-      this.fireStatus();
-      return;
-    }
-    if (colabDeckError.code === 'PROBE_PROTOCOL_MISMATCH') {
-      this.connection = 'error';
-      this.probeView = null;
-      this.lastError = colabDeckError;
-      this.stopSampler();
-      this.fireError(colabDeckError);
-      this.fireProbeLost(server.id, colabDeckError.message);
-      this.fireStatus();
-      return;
-    }
-    this.connection = 'stale';
-    this.lastError = colabDeckError;
-    this.fireProbeLost(server.id, colabDeckError.message);
-    this.fireStatus();
-    this.scheduleRestart(server);
-  }
-
-  private scheduleRestart(server: ServerDescriptor): void {
-    this.stopSampler();
-    if (this.restartAttempts >= MAX_RESTART_ATTEMPTS) {
-      const error = new ColabDeckError('Monitoring stopped responding.', {
-        code: 'PROBE_STALE',
-        detail: 'Retry to restart monitoring.',
-        recoverable: true,
-        action: 'RETRY',
-      });
-      this.connection = 'error';
-      this.lastError = error;
-      this.fireError(error);
-      this.fireStatus();
-      return;
-    }
-    this.restartAttempts += 1;
-    const error = new ColabDeckError('Monitoring stopped responding.', {
-      code: 'PROBE_STALE',
-      detail: 'Automatic recovery is paused to avoid opening or closing a Colab terminal. Retry monitoring when you are ready.',
-      recoverable: true,
-      action: 'RETRY',
-    });
-    this.connection = 'error';
+  private fail(server: ServerDescriptor, error: ColabDeckError, connection: 'error' | 'stale' = 'error'): void {
+    this.resetSampling();
+    this.store.clear(server.id);
+    this.connection = connection;
+    this.probeView = this.probeView ? { ...this.probeView, status: connection } : null;
     this.lastError = error;
-    this.fireError(error);
+    this.fireProbeLost(server.id, error.message);
+    this.errorEmitter.fire({ error, serverId: server.id });
     this.fireStatus();
-    this.logger.warn(
-      `[Monitoring] probe stale for ${server.label}; automatic restart disabled to avoid terminal side effects (attempt ${this.restartAttempts}/${MAX_RESTART_ATTEMPTS})`,
-    );
+    this.resetEmitter.fire(server.id);
   }
 
-  private async restartInternal(server: ServerDescriptor, operationId: number): Promise<void> {
-    if (this.disposed || !this.paths || this.current?.id !== server.id) {
-      return;
+  private async stopProbe(paths: ProbePaths, status: ProbeStatus, signal?: AbortSignal): Promise<void> {
+    const reader = new ProbeReader(paths, this.logger);
+    const current = await reader.readStatus();
+    signal?.throwIfAborted();
+    if (current.bootId !== status.bootId || current.state === 'stopping' || current.probeDir !== paths.dir) return;
+    const stopped = await this.commandClient.stop(paths.serverId, paths.relativeDir);
+    if (stopped) {
+      const deadline = Date.now() + 10_000;
+      do {
+        await delay(500);
+        const updated = await reader.readStatus();
+        if (updated.state === 'stopping' || updated.bootId !== status.bootId) return;
+      } while (Date.now() < deadline);
     }
-    if (operationId !== this.operationId) return;
-    this.lastRestartAt = Date.now();
-    this.stopSampler();
-    const stopped = await this.commandClient.stop(server.id, this.paths.relativeDir, 2_000);
-    if (!stopped) {
-      this.logger.warn(`[Monitoring] probe did not acknowledge STOP for ${server.label}; aborting restart to avoid touching another terminal`);
-      this.connection = 'error';
-      this.lastError = new ColabDeckError('The previous probe did not stop.', {
-        code: 'PROBE_STALE',
-        detail: 'ColabDeck did not open another terminal or inject a kill command. Stop the probe from the existing Colab terminal, then retry monitoring.',
-        recoverable: true,
-        action: 'RETRY',
-      });
-      this.fireError(this.lastError);
-      this.fireStatus();
-      return;
-    }
-    if (operationId !== this.operationId) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    if (operationId !== this.operationId) {
-      return;
-    }
-    this.connection = 'syncing';
-    this.probeView = null;
-    this.fireStatus();
-    try {
-      await this.installer.install(server, this.paths);
-      if (operationId !== this.operationId) return;
-      await this.launcher.launch(server, this.paths, this.configProvider().sampleIntervalMs);
-      if (operationId !== this.operationId) return;
-      this.store.clear(server.id);
-      this.resetEmitter.fire(server.id);
-      this.reader = new ProbeReader(this.paths, this.logger);
-      this.startSampler();
-      await this.tick();
-    } catch (error) {
-      this.lastError = this.asColabDeckError(error, 'PROBE_LAUNCH_FAILED');
-      this.connection = 'error';
-      this.probeView = null;
-      this.logger.error(`[Monitoring] failed to restart probe for ${server.label}`, error);
-      this.fireError(this.lastError);
-      this.fireProbeLost(server.id, this.lastError.message);
-      this.fireStatus();
-    }
-  }
-
-  private stopInternal(sendStop: boolean): void {
-    this.stopSampler();
-    if (this.restartTimer) {
-      clearTimeout(this.restartTimer);
-      this.restartTimer = null;
-    }
-    const server = this.current;
-    this.reader = null;
-    if (sendStop && server && this.paths) {
-      this.pendingStop = this.commandClient.stop(server.id, this.paths.relativeDir);
-    }
-    this.current = null;
-    this.paths = null;
-    this.connection = 'disconnected';
-    this.probeView = null;
-    this.lastSeqAdvanceAt = 0;
-    this.consecutiveErrors = 0;
+    throw new ColabDeckError('The previous monitoring probe did not stop.', {
+      code: 'PROBE_STALE', action: 'RETRY',
+    });
   }
 
   private fireStatus(): void {
@@ -538,10 +390,6 @@ export class MonitoringService implements vscode.Disposable {
 
   private fireServerDisconnected(serverId: string, reason: string): void {
     this.disconnectedEmitter.fire({ serverId, reason });
-  }
-
-  private fireError(error: ColabDeckError): void {
-    this.errorEmitter.fire({ error, serverId: this.current?.id ?? '' });
   }
 
   private asColabDeckError(error: unknown, fallbackCode: ColabDeckError['code']): ColabDeckError {

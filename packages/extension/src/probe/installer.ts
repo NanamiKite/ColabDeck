@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import { ColabDeckError } from '@colabdeck/shared';
 import { activateColabExtension } from '../colabExtension.js';
@@ -14,8 +15,11 @@ export class ProbeInstaller {
     private readonly logger: Logger,
   ) {}
 
-  async install(server: ServerDescriptor, paths: ProbePaths): Promise<void> {
-    if (!(await activateColabExtension(this.logger))) {
+  async install(server: ServerDescriptor, paths: ProbePaths, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    const available = await activateColabExtension(this.logger);
+    signal?.throwIfAborted();
+    if (!available) {
       throw new ColabDeckError('The official Google Colab extension is not available.', {
         code: 'SERVER_UNAVAILABLE',
         detail: 'Install and sign in to the official Colab extension, then retry.',
@@ -28,6 +32,7 @@ export class ProbeInstaller {
     try {
       script = await vscode.workspace.fs.readFile(scriptUri);
     } catch (error) {
+      signal?.throwIfAborted();
       throw new ColabDeckError('ColabDeck monitoring files are missing.', {
         code: 'PROBE_WRITE_FAILED',
         detail: 'Reinstall ColabDeck, then retry.',
@@ -36,6 +41,7 @@ export class ProbeInstaller {
         cause: error,
       });
     }
+    signal?.throwIfAborted();
     // Writing goes through the official colab:// provider, which needs the server to be authorized
     // and reachable. Check that first so an unreachable server fails fast with a clear reason
     // instead of a file write error.
@@ -43,17 +49,14 @@ export class ProbeInstaller {
     try {
       await vscode.workspace.fs.stat(content);
     } catch (error) {
+      signal?.throwIfAborted();
       const reason = error instanceof vscode.FileSystemError ? error.code : error instanceof Error ? error.message : String(error);
       this.logger.warn(`[ProbeInstaller] ${content.toString()} is not reachable (${reason})`);
-      const advice =
-        reason === 'Unavailable'
-          ? 'The official Colab extension no longer lists this server, which usually means the runtime was released or reassigned. Run "Colab: Mount Server to Workspace" again, then pick the new server.'
-          : 'Make sure the server is still assigned in the Colab extension and that you are signed in, then retry.';
       throw new ColabDeckError('The Colab server is not reachable.', {
         code: 'SERVER_UNAVAILABLE',
-        detail: `Could not read ${content.toString()} through the official Colab extension (${reason}). ${advice}`,
+        detail: `Could not read ${content.toString()} through the official Colab extension (${reason}). Check that Colab is signed in and can open the assigned runtime's files, then retry.`,
         recoverable: true,
-        action: reason === 'Unavailable' ? 'MOUNT_COLAB_SERVER' : 'RETRY',
+        action: 'RETRY',
         cause: error,
       });
     }
@@ -61,31 +64,37 @@ export class ProbeInstaller {
     // writes. Retry instead of surfacing a write error the user cannot act on.
     let lastError: unknown = null;
     for (let attempt = 1; attempt <= ProbeInstaller.WRITE_ATTEMPTS; attempt += 1) {
+      signal?.throwIfAborted();
       try {
-        await this.prepare(paths, script);
+        await this.prepare(paths, script, signal);
+        signal?.throwIfAborted();
         this.logger.info(`[ProbeInstaller] wrote ${paths.script.toString()} (${script.byteLength} bytes)`);
         return;
       } catch (error) {
+        signal?.throwIfAborted();
         lastError = error;
         this.logger.warn(
           `[ProbeInstaller] attempt ${attempt}/${ProbeInstaller.WRITE_ATTEMPTS} failed: ${describeFsError(error)}`,
         );
         if (attempt < ProbeInstaller.WRITE_ATTEMPTS) {
-          await new Promise((resolve) => setTimeout(resolve, ProbeInstaller.WRITE_RETRY_DELAY_MS));
+          await delay(ProbeInstaller.WRITE_RETRY_DELAY_MS, undefined, { signal });
         }
       }
     }
     throw this.writeError('prepare the monitoring directory', paths.root, lastError);
   }
 
-  private async prepare(paths: ProbePaths, script: Uint8Array): Promise<void> {
-    if (!(await this.isDirectory(paths.root))) {
+  private async prepare(paths: ProbePaths, script: Uint8Array, signal?: AbortSignal): Promise<void> {
+    const directoryExists = await this.isDirectory(paths.root);
+    signal?.throwIfAborted();
+    if (!directoryExists) {
       try {
         await vscode.workspace.fs.createDirectory(paths.root);
       } catch (error) {
         throw this.writeError('create the monitoring directory', paths.root, error);
       }
     }
+    signal?.throwIfAborted();
     try {
       await vscode.workspace.fs.writeFile(paths.script, script);
     } catch (error) {
