@@ -176,6 +176,7 @@ export class NotebookMonitoringService implements vscode.Disposable {
     this.sessionId = null;
     this.sessionDirectory = null;
     this.target = null;
+    this.notebookLabel = null;
     this.state = 'idle';
     this.message = message;
     this.samples = [];
@@ -186,6 +187,7 @@ export class NotebookMonitoringService implements vscode.Disposable {
     this.sessionId = null;
     this.sessionDirectory = null;
     this.target = null;
+    this.notebookLabel = null;
     this.samples = [];
     this.message = error instanceof Error ? error.message : String(error);
     this.logger.warn('[NotebookMonitoring] unable to start or sync notebook monitoring', error);
