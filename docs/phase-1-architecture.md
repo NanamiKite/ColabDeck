@@ -1,6 +1,6 @@
 # ColabDeck — 架构设计与契约定义
 
-> 本文定义 ColabDeck 的稳定架构、边界与契约。具体版本兼容性和现场验证结果不作为架构规范的一部分。
+> 本文定义 ColabDeck 的稳定架构、边界与契约。具体版本兼容性和现场验证结果不作为架构规范的一部分。启动流程以“当前实现”段落为准；早期草图中的自动终端启动方案已废弃。
 
 ---
 
@@ -8,8 +8,8 @@
 
 1. **官方 Colab 扩展没有可用的 `exports`。** `activate()` 返回 `undefined`，内部 `assignmentManager`、`colabApiClient`、`serverCollection` 均未导出。我们不能依赖 `extension.exports`。
 2. **官方暴露的公共集成面只有三类**：贡献命令、`colab://` 文件系统、Jupyter 扩展的公共 Kernel API；官方状态栏/树视图对第三方不可读。
-3. **推荐主通道**：通过官方 `colab://<serverId>/content/...` 文件系统写入一个独立后台探针 `colabdeck_probe.py`，用官方 `colab.openTerminal` 命令启动它；探针只读写本地文件，不连接 Jupyter、不产生心跳。扩展宿主用 `workspace.fs` 轮询 `metrics.jsonl`。这条链路**不调用任何 Google 私有接口**。
-4. **可选的无感通道**：`ms-toolsai.jupyter` 的 `getKernelService()` 可拿到活动 Colab kernel 的 `serverProviderHandle.handle`（即 serverId）；`getKernel(uri).connection.serverSettings` 提供已认证的 Jupyter 连接，从而实现自动发现与“隐形启动”。但它需要用户一次性授予 Jupyter Kernel API 权限；拒绝时必须能完整降级。
+3. **推荐主通道**：通过官方 `colab://<serverId>/content/...` 文件系统写入一个独立后台探针 `colabdeck_probe.py`，复用用户已为当前服务器打开的、名称精确匹配的官方 Colab 终端发送启动命令；ColabDeck 不调用 `colab.openTerminal`，不打开、隐藏或销毁终端。探针只读写本地文件，不连接 Jupyter、不产生心跳。扩展宿主用 `workspace.fs` 轮询 `metrics.jsonl`。这条链路**不调用任何 Google 私有接口**。
+4. **可选的 Jupyter 通道**：`ms-toolsai.jupyter` 的 `getKernelService()` 可读取活动 Colab kernel 状态，并为需要主内核的可选工具提供能力；它需要用户一次性授予 Jupyter Kernel API 权限，拒绝时必须能完整降级。监控探针不从 notebook kernel 启动。
 5. **Idle Guard 的释放需要用户确认**：ColabDeck 只调用官方释放命令并等待其结果，不模拟或自动确认官方对话框。
 6. **MVP 最小闭环**：挂载/发现 server → 写入并启动探针 → 读取 JSONL → RingBuffer → 状态栏 → Webview。这个闭环不需要 Jupyter Kernel API 授权，也不需要任何私有接口。
 7. **明确不做**：不调用 `api/colab/resources`、`/colab/tty`、`colabApiClient`、计费/配额接口；不维护 Google OAuth；不实现保活心跳；不用主内核同步执行 `nvidia-smi`。
@@ -25,7 +25,7 @@
 | `google.colab` 的 `exports` | **无** | bundle 末尾为 `0&&(module.exports={activate})`；`activate()` 内部 `uB()` 不返回对象 | 否 |
 | `google.colab` 的 `activate()` 返回值 | `undefined` | 同上 | 否 |
 | `assignmentManager` / `serverCollection` | 仅内部持有 | `dE()` 返回给 `uB()`，未导出 | 否 |
-| 贡献命令 `colab.openTerminal` | 公开命令 | 处理器 `fR`：一个服务器直接打开；多个则 QuickPick；`mR` 用 `ColabPseudoterminal` 连接 `/colab/tty` | **是**（启动探针） |
+| 贡献命令 `colab.openTerminal` | 公开命令 | 处理器 `fR`：一个服务器直接打开；多个则 QuickPick；`mR` 用 `ColabPseudoterminal` 连接 `/colab/tty` | 否（仅由用户手动打开终端） |
 | 贡献命令 `colab.removeServer` | 公开命令 | 处理器 `OE`：先 `getServers("all")`，有服务器时随后**总是** `showQuickPick`；确认后 `unassignServer` | **是**（Idle Guard 释放，需用户确认） |
 | 贡献命令 `colab.mountServer` | 公开命令 | 处理器 `CE`：把 `colab://<serverId>/content` 加入 workspace folders | **是**（serverId 发现的降级方案） |
 | 贡献命令 `colab.toolbarCommand` | 公开命令 | QuickPick 菜单（View Existing Servers / Auto Connect / New Server / Open Web） | 否 |
@@ -65,7 +65,7 @@ colab.mountDrive / colab.upload / colab.download / ...
 - 终端由 `window.createTerminal({ name: server.label, pty: ColabPseudoterminal, iconPath })` 创建。
 - `ColabPseudoterminal` 通过 `ColabTerminalWebSocket` 连接 `/colab/tty`，不是标准 Jupyter `/api/terminals`。
 - 稳定 VS Code API **不能读取**这个自定义 PTY 的输出（`onDidChangeTerminalData` 是 proposed API；shell integration 也不会注入到自定义 PTY）。
-- 因此我们只用它**启动一个 detached 探针**，不解析终端输出。
+- 因此 ColabDeck 不自行调用它，也不解析终端输出；用户先用该命令打开匹配终端后，ColabDeck 只复用这个已存在的终端启动 detached 探针。
 
 #### 1.2.2 `colab.removeServer` 的实际行为
 
@@ -163,7 +163,7 @@ colab://<serverId>/content/<path>
 | 接口 | 为什么不用 |
 | --- | --- |
 | `api/colab/resources` | 未文档化的 Colab 运行时端点；虽然官方 Resources 视图用它，但不含温度/进程，且不符合“只使用公共接口”的边界。我们用标准 Jupyter Contents API + 自己的探针替代。 |
-| `/colab/tty` | 官方终端专用 WebSocket，需要复刻 Colab 认证头与协议；我们直接调用官方 `colab.openTerminal` 命令。 |
+| `/colab/tty` | 官方终端专用 WebSocket，需要复刻 Colab 认证头与协议；由官方终端管理，ColabDeck 不直接调用或实现。 |
 | `colabApiClient.*` | Google 私有运行时 API；禁止抓包/模拟。释放只调用官方 `colab.removeServer` 命令。 |
 | 计费/配额 API | 严禁调用；状态栏只显示硬件与 Idle Guard 状态，不显示算力余额。 |
 | `colab.consumptionStatusBar` 的数据 | 其他扩展无法读取；也不应重复官方的计费展示。我们使用独立的状态栏项与优先级。 |
@@ -172,9 +172,9 @@ colab://<serverId>/content/<path>
 
 | 场景 | serverId 发现 | 数据通道 | 探针启动 | 说明 |
 | --- | --- | --- | --- | --- |
-| **A. Jupyter API 已授权 + 有活动 Colab kernel** | `getActiveKernels()` 的 `metadata.serverProviderHandle.handle` | `workspace.fs` 读 `colab://<id>/content/.colabdeck/metrics.jsonl` | 可选内核通道或官方终端 | 最完整的可选路径 |
-| **B. 未授权 / 无活动 kernel，但已挂载 server** | `workspace.workspaceFolders` 中 `scheme === 'colab'` 的 authority | 同上 | `colab.openTerminal` | MVP 推荐路径；无需授权 |
-| **C. 曾经发现过 server** | `globalState` 持久化 serverId + `workspace.fs.stat` 探活 | 同上 | `colab.openTerminal` | 重启扩展宿主后恢复 |
+| **A. Jupyter API 已授权 + 有活动 Colab kernel** | 当前挂载的 `workspace.workspaceFolders` 中 `scheme === 'colab'` 的 authority | `workspace.fs` 读 `colab://<id>/content/.colabdeck/metrics.jsonl` | 用户先打开名称匹配的官方终端；ColabDeck 只复用该终端 | Jupyter API 仅用于可选内核状态/工具 |
+| **B. 未授权 / 无活动 kernel，但已挂载 server** | `workspace.workspaceFolders` 中 `scheme === 'colab'` 的 authority | 同上 | 用户先打开名称匹配的官方终端；ColabDeck 只复用该终端 | MVP 路径；无需授权 |
+| **C. 曾经发现过 server** | 不自动恢复未挂载的旧 server；只使用当前 workspace 中仍挂载的 server | 同上 | 用户先打开名称匹配的官方终端；ColabDeck 只复用该终端 | 避免对已释放 runtime 或错误终端发命令 |
 | **D. 无 server / 未登录 / 无权限** | — | — | — | 显示设置向导：打开 notebook、挂载 server、登录 Colab |
 | **E. CPU/TPU runtime** | 同上 | 可采集 RAM/disk/CPU/温度 | 同上 | Idle Guard 进入 `UNSUPPORTED`，不误释放 |
 
@@ -190,7 +190,7 @@ colab://<serverId>/content/<path>
 1. `getActiveKernels()` 对 Colab kernel 确实返回 `serverProviderHandle.handle`，且与 `colab://` authority 一致。
 2. `getKernel(uri).connection.serverSettings` 能被我们使用的 `@jupyterlab/services` 版本消费，并且能通过官方包装的 `fetch`/`WebSocket` 认证。
 3. `workspace.fs` 在**没有挂载** workspace folder 时，仅凭 serverId 就能读写 `colab://<id>/content/...`。
-4. `colab.openTerminal` 能被程序调用；新终端可以通过 `name === server.label` 与 `creationOptions` 中的 `pty` 匹配；`terminal.sendText` 能启动 detached 进程；终端 dispose 后探针仍存活。
+4. 用户可通过官方 Colab 命令打开终端；ColabDeck 能通过 `name === server.label` 或 `name === server.id` 匹配已存在终端，`terminal.sendText` 能启动 detached 进程；ColabDeck 不负责终端生命周期。
 5. `status.json` / `metrics.jsonl` 的读写、原子替换、半行处理都符合预期。
 6. `nvidia-smi` 在 T4/L4/A100 上的查询格式；per-process memory 是否可用；不可用时 procfs 回退是否正确。
 7. `colab.removeServer` 的 QuickPick 行为；确认后 workspace folder 被移除/FS 失效的时序。
@@ -1752,7 +1752,7 @@ export interface ColabDeckError {
 | `SERVER_ID_UNAVAILABLE` | 挂载 server 或授权 Kernel API | 可恢复 |
 | `SERVER_UNAUTHORIZED` | 登录 Colab | 可恢复 |
 | `PROBE_LAUNCH_FAILED` | 打开 Probe Log / 重试 | 可恢复 |
-| `PROBE_STALE` | 等待自动重启 / 重试 | 可恢复 |
+| `PROBE_STALE` | 手动 Retry；不会自动打开或关闭终端 | 可恢复 |
 | `PROBE_PROTOCOL_MISMATCH` | 重装探针 | 可恢复 |
 | `RELEASE_COMMAND_UNAVAILABLE` | 安装/启用官方 Colab 扩展 | 可恢复 |
 | `RELEASE_INTERACTIVE_ONLY` | 在官方 QuickPick 中确认 | 可恢复 |
@@ -1778,7 +1778,7 @@ export interface ColabDeckError {
 最小闭环不追求多服务器、不追求完整 Toolbox、不追求自动释放；它只验证三个关键假设：
 
 1. 官方 `colab://` 文件系统能承载探针数据。
-2. 官方 `colab.openTerminal` 能启动一个 detached 探针，且探针不依赖 Jupyter。
+2. 用户打开的、名称精确匹配的官方 Colab 终端能启动一个 detached 探针，且探针不依赖 Jupyter；ColabDeck 不自动打开或销毁终端。
 3. 状态栏与 Webview 能稳定消费 RingBuffer。
 
 ### 4.2 最小闭环架构
@@ -1795,7 +1795,7 @@ export interface ColabDeckError {
 │       │                   │                  │                                             │
 └───────┼───────────────────┼──────────────────┼─────────────────────────────────────────┘
         │                   │                  │
-        │ workspace.fs      │ workspace.fs    │ executeCommand('colab.openTerminal')
+        │ workspace.fs      │ workspace.fs    │ existing Colab terminal.sendText()
         ▼                   ▼                  ▼
 ┌─────────────────────────────── Colab Runtime ───────────────────────────────────────┐
 │                                                                                      │
@@ -1818,9 +1818,9 @@ export interface ColabDeckError {
 | Step | 做什么 | 关键文件 | 验收标准 |
 | --- | --- | --- | --- |
 | 0. 准备 | 安装官方 Colab + Jupyter；登录；分配一台 GPU；打开 notebook 并选中 Colab kernel；挂载 server 到 workspace | 手工 | `colab://<id>/content` 出现在 workspace folders |
-| 1. 发现 | 扫描 `workspace.workspaceFolders` 中 `scheme === 'colab'` 的 folder，得到 `serverId`/`label`；读 `globalState` 的 lastServer 做恢复 | `server/mountedFolderDiscovery.ts`、`server/serverRegistry.ts` | `ColabDeck: Show Server Info` 输出 serverId/label |
+| 1. 发现 | 扫描当前 `workspace.workspaceFolders` 中 `scheme === 'colab'` 的 folder，得到 `serverId`/`label`；不从 `globalState` 恢复未挂载的旧 server | `server/serverRegistry.ts` | `ColabDeck: Show Server Info` 输出 serverId/label |
 | 2. 安装探针 | 读取 `resources/probe/colabdeck_probe.py`，用 `workspace.fs.writeFile` 写到 `colab://<id>/content/.colabdeck/colabdeck_probe.py` | `probe/probeInstaller.ts`、`probe/probePaths.ts` | 远端 `cat` 能看到脚本；无权限错误有明确提示 |
-| 3. 启动探针 | 调用 `colab.openTerminal`，等待新终端，`sendText("nohup ... &")`，轮询 `status.json` 直到 `seq` 增长；隐藏/dispose 终端。若官方命令弹出 QuickPick，Host 显示提示并等待用户选择 | `probe/probeLauncher.ts` | `status.json` 的 `pid` 存在；`seq` 每 5s +1；终端关闭后进程仍在 |
+| 3. 启动探针 | 用户先在官方 Colab 扩展中打开当前服务器终端；ColabDeck 匹配现有终端后 `sendText("nohup ... &")`，轮询 `status.json` 直到 `seq` 增长；不打开、隐藏或 dispose 终端 | `probe/launcher.ts` | `status.json` 的 `pid` 存在；`seq` 每 5s +1；终端生命周期由用户/官方扩展管理 |
 | 4. 读取 | 每 5s 读 `status.json`；若 `seq` 前进则读 `metrics.jsonl`；只解析完整行；写入 RingBuffer；`seq` 倒退/`bootId` 变化则重置 | `probe/probeReader.ts`、`telemetry/telemetryStore.ts` | 日志打印一条 sample；GPU/RAM/disk 与 `nvidia-smi`/`free -h`/`df -h` 一致 |
 | 5. 状态栏 | 从最新样本构造 `T4 \| VRAM 8.2/15G \| Idle Guard: ON`；点击聚焦 Webview。显存/内存用二进制 GiB、显示为 `G`、保留 1 位小数 | `statusbar/statusBarController.ts` | 文本正确；5s 内更新；点击打开侧边栏 |
 | 6. Webview | Vite + Preact + uPlot；`READY` 握手；`SNAPSHOT` + `TELEMETRY_BATCH`；先画一张 GPU 利用率曲线 | `webview/dashboardProvider.ts`、`packages/webview/src/App.tsx` | 30 分钟数据可渲染；无 CSP 错误；主题变量生效 |
@@ -1865,31 +1865,21 @@ registry.onDidChangeServers(async (servers) => {
 
 ```ts
 // TerminalProbeLauncher（核心步骤）
-const before = new Set(vscode.window.terminals);
-const opened = new Promise<vscode.Terminal>((resolve, reject) => {
-  const timer = setTimeout(() => reject(new Error('Terminal not opened')), 15_000);
-  const disposable = vscode.window.onDidOpenTerminal((terminal) => {
-    if (before.has(terminal)) return;
-    // 挂载模式下官方 terminal.name === server.label；不要用泛 PTY fallback，
-    // 多服务器时可能连到错误的 runtime。Kernel API 模式优先走临时 kernel 启动。
-    if (terminal.name === server.label) {
-      clearTimeout(timer);
-      disposable.dispose();
-      resolve(terminal);
-    }
+const terminal = vscode.window.terminals.find(
+  (item) => !item.exitStatus && (item.name === server.label || item.name === server.id),
+);
+if (!terminal) {
+  throw new ColabDeckError('Open the matching Colab terminal first.', {
+    code: 'PROBE_LAUNCH_FAILED',
+    action: 'RETRY',
   });
-});
-
-await vscode.commands.executeCommand('colab.openTerminal');
-const terminal = await opened;
+}
 terminal.sendText(
   `cd /content && COLABDECK_PROBE_DIR=${probeDir} COLABDECK_INTERVAL_MS=${intervalMs} ` +
   `nohup python3 ${probeDir}/colabdeck_probe.py </dev/null >>${probeDir}/probe.log 2>&1 &`,
   true,
 );
 await waitForStatus(server, 15_000);
-terminal.hide();
-terminal.dispose();
 ```
 
 ### 4.5 验收标准（DoD）
@@ -1900,7 +1890,7 @@ terminal.dispose();
 - [ ] 主内核执行时间与未安装 ColabDeck 时相比无显著差异（±5%，排除正常波动）。
 - [ ] GPU 利用率/显存/RAM/磁盘/温度与 `nvidia-smi`、`free -h`、`df -h` 读数一致（误差 <5%）。
 - [ ] 状态栏显示 `T4 | VRAM 8.2/15G | Idle Guard: ON`，点击打开侧边栏。
-- [ ] 手动 `kill <probe pid>` 后，15 秒内状态栏显示 `STALE`，并自动重启探针（最多 3 次）。
+- [ ] 手动 `kill <probe pid>` 后，15 秒内状态栏显示 `STALE`，停止采样并提示用户手动 Retry；不自动打开或关闭终端。
 - [ ] Idle Guard 的每次状态转换都有日志；Cancel 后回到 `ACTIVE` 并重置计时。
 - [ ] 停止探针/断开 server 时，Idle Guard 绝不调用释放命令。
 - [ ] 官方 `colab.removeServer` 打开 QuickPick；用户确认后 server 被移除；取消后回到 `ACTIVE`。
@@ -1999,7 +1989,7 @@ User                 VS Code                  ColabDeck Host             Colab R
  │-- mount server ----->│                           │                          │
  │                      │-- workspaceFolders ------>│                          │
  │                      │                           │-- write probe.py ------->│
- │                      │                           │-- colab.openTerminal ---->│
+ │                      │                           │-- existing terminal.sendText() -->│
  │                      │                           │   (official terminal)    │
  │                      │                           │-- sendText(nohup...) -->│
  │                      │                           │                          │-- start probe
