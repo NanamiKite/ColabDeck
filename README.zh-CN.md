@@ -20,10 +20,10 @@
 
 1. 从 Marketplace 安装：在扩展面板（`Ctrl+Shift+X`）搜索 `ColabDeck`，或在命令面板执行 `ext install NanamiKite.colabdeck`。
 2. 在官方 Colab 扩展中分配 runtime。
-3. 点击活动栏或状态栏打开 Dashboard，点击 **Mount server**。Dashboard 默认在侧边栏打开，拖宽后呈两列布局。
-4. 状态变为 `connected` 后曲线开始更新。
+3. 从活动栏或状态栏打开 ColabDeck。如果当前工作区还没挂载该 runtime，点击 **Mount server**。
+4. 点击 **Start Monitoring**。如果探针还没运行，在官方 Colab 扩展里打开这个 runtime 的终端，等终端连上后点击 **Retry Monitoring**。面板显示 **Connected** 后，曲线开始更新。
 
-一直停在 `Starting`：点 **Refresh**；错误卡里有 **Retry** 和 **View diagnostics**。连接处于 `error` / `stale`，或已选服务器但 `disconnected` 时，头部会出现 **Restart probe**。
+挂载不会启动监控。如果还没打开工作区，官方 Colab 的挂载命令可能重新加载 VS Code。**Refresh** 只刷新面板；监控报错时，点击 **Retry Monitoring**。
 
 <details>
 <summary><b>从源码安装</b></summary>
@@ -57,7 +57,6 @@ code --install-extension release/colabdeck-<version>.vsix
 
 - 释放需要在官方对话框里确认；"自动释放"只是把对话框打开。
 - 一次只监控一个选中的服务器。
-- 启动监控前，请先在官方 Colab 扩展中打开与服务器匹配的终端。ColabDeck 只复用这个已存在的精确匹配终端，不会自动调用 `colab.openTerminal`、打开、隐藏或销毁终端。
 - 不显示算力点余额：ColabDeck 不调用 Google 私有配额接口，也不模拟 Jupyter / Colab 私有协议。
 - Jupyter 扩展不向此发布者开放 Kernel API，ColabDeck 读不到 notebook 内核是否正忙，Idle Guard 按"未知"处理照常释放；清 CUDA 缓存功能不可用。
 - GPU 温度和功耗依赖 `nvidia-smi`，个别机型返回 `[N/A]`，显示为 `—`。

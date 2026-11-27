@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CountdownPhase, IdleGuardStatus } from '../idleGuard/states.js';
 
-export const WEBVIEW_PROTOCOL_VERSION = 1 as const;
+export const WEBVIEW_PROTOCOL_VERSION = 2 as const;
 
 export type TimeRange = '15m' | '30m' | '1h';
 
@@ -162,7 +162,7 @@ export interface DashboardSettings {
 }
 
 export interface DashboardSnapshot {
-  readonly protocol: 1;
+  readonly protocol: typeof WEBVIEW_PROTOCOL_VERSION;
   readonly generatedAtMs: number;
   readonly servers: readonly ServerView[];
   readonly selectedServerId: string | null;
@@ -212,7 +212,8 @@ export type WebviewToHostMessage =
     }
   | { readonly type: 'DISMISS_ERROR'; readonly errorId: string }
   | { readonly type: 'MOUNT_COLAB_SERVER' }
-  | { readonly type: 'RELOAD_WINDOW' }
+  | { readonly type: 'REFRESH_SERVERS' }
+  | { readonly type: 'START_MONITORING' }
   | { readonly type: 'OPEN_SETTINGS' }
   | { readonly type: 'OPEN_PROBE_LOG' }
   | { readonly type: 'RETRY_PROBE' };
@@ -256,7 +257,7 @@ export type ToolboxResult =
 export type HostToWebviewMessage =
   | {
       readonly type: 'PROTOCOL_MISMATCH';
-      readonly hostProtocol: 1;
+      readonly hostProtocol: typeof WEBVIEW_PROTOCOL_VERSION;
       readonly webviewProtocol: number;
     }
   | { readonly type: 'SNAPSHOT'; readonly snapshot: DashboardSnapshot }
@@ -377,7 +378,8 @@ export const webviewToHostMessageSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('MOUNT_COLAB_SERVER') }).strict(),
-  z.object({ type: z.literal('RELOAD_WINDOW') }).strict(),
+  z.object({ type: z.literal('REFRESH_SERVERS') }).strict(),
+  z.object({ type: z.literal('START_MONITORING') }).strict(),
   z.object({ type: z.literal('OPEN_SETTINGS') }).strict(),
   z.object({ type: z.literal('OPEN_PROBE_LOG') }).strict(),
   z.object({ type: z.literal('RETRY_PROBE') }).strict(),

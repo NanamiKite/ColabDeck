@@ -113,7 +113,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
     context,
     logger,
     registry,
-    store,
     monitoring,
     idleGuard,
     errors,
@@ -156,17 +155,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
     monitoring.onError(({ error, serverId }) => errors.push(error, serverId)),
     idleGuard.onError((error) => errors.push(error, registry.currentId)),
     registry.onDidChangeSelection((server) => {
-      if (!server) {
-        const idleServerId = idleGuard.serverId;
-        monitoring.stop();
-        if (idleServerId) {
-          idleGuard.handleServerDisconnected(idleServerId, 'no server selected');
-        }
-        return;
+      const active = monitoring.getServer();
+      if (active && active.id !== server?.id) {
+        monitoring.stop(false);
       }
-      void monitoring.start(server).catch((error) => {
-        logger.error(`[ColabDeck] failed to start monitoring for ${server.label}`, error);
-      });
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void registry.refresh();
@@ -175,26 +167,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<ColabD
       if (!event.affectsConfiguration('colabdeck')) {
         return;
       }
-      const previous = config;
       config = readConfig();
       logger.setLevel(config.logLevel);
       store.setInterval(config.sampleIntervalMs);
       idleGuard.updateSettings(config.idleGuard);
-      if (previous.sampleIntervalMs !== config.sampleIntervalMs || previous.probeDir !== config.probeDir) {
-        void monitoring.restart().catch((error) => {
-          errors.push(
-            error instanceof ColabDeckError
-              ? error
-              : new ColabDeckError(error instanceof Error ? error.message : String(error), {
-                  code: 'UNKNOWN',
-                  recoverable: true,
-                  action: 'RETRY',
-                  cause: error,
-                }),
-            registry.currentId,
-          );
-        });
-      }
       dashboard.sendSnapshot();
     }),
   );

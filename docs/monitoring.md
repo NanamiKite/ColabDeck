@@ -25,12 +25,14 @@ VRAM 另有 **Window peak**：当前时间窗内观测到的显存最大值。�
 
 ## 采集过程
 
-1. 点击 **Mount server** 后，扩展把 `colabdeck_probe.py` 写到远端 `probeDir`（默认 `/content/.colabdeck`）。请先在官方 Colab 扩展中为当前服务器打开终端；ColabDeck 只会复用名称精确匹配的已存在终端，并用 `nohup` 在后台启动探针。它不会调用 `colab.openTerminal`，也不会打开、隐藏或销毁终端，避免抢占 notebook 焦点或干扰其他扩展。
+1. 点击 **Mount server** 只挂载服务器。点击 **Start Monitoring** 后，ColabDeck 优先接入正在采样的探针。首次启动需要在官方 Colab 扩展里为当前服务器打开终端，等终端连上后点 **Retry Monitoring**。ColabDeck 将 `colabdeck_probe.py` 写入远端 `probeDir`（默认 `/content/.colabdeck`），在唯一匹配的现有官方终端中用 `nohup` 启动后台探针，不打开、隐藏或关闭终端。
 2. 探针按 `colabdeck.probe.sampleIntervalMs`（默认 5000 ms）采样，追加到 `metrics.jsonl`，并原子覆盖 `status.json`。
 3. 宿主通过官方 `colab://` 文件系统按偏移增量读取 `metrics.jsonl`，只解析到最后一个完整换行。
 4. Webview 收到新样本后更新曲线。Webview 隐藏时宿主继续采样，恢复可见时补发快照和批量数据。
 
 探针只用 Python 标准库，不连接 Jupyter，也不访问网络。文件格式、2 MB 轮转和命令队列见 [`protocol.md`](protocol.md)。
+
+**Refresh** 和时间窗切换只更新面板，不启动或重启探针。切换服务器只停止读取原服务器的数据，不停止远端探针；要开始监控新服务器，请点击 **Start Monitoring**。
 
 ## 时间窗与下采样
 
@@ -46,13 +48,13 @@ GPU 卡片顶部显示 `Last sample Xs ago`。以下任一情况会标为过期�
 - 最新样本距今超过 15 秒；
 - 连接状态为 `disconnected`、`stale` 或 `error`。
 
-样本序号超过 `colabdeck.idleGuard.staleSampleSeconds`（默认 15 秒）没有推进，宿主把连接标为 `stale`，状态栏追加 `OUT OF DATE`，并停止自动恢复，避免后台打开或关闭官方终端。请用 **Refresh** 或头部的 **Restart probe** 手动恢复。
+样本序号超过 `colabdeck.idleGuard.staleSampleSeconds`（默认 15 秒）没有推进时，Idle Guard 暂停。ColabDeck 不会自动重启探针；可以点击面板头部的 **Retry Monitoring** 重新连接。如需重启探针，请在命令面板运行 `ColabDeck: Restart Monitoring`。
 
 ## 启动采集的前提
 
 - 官方 `colab://` 文件系统以 `/content` 为根，所以 `colabdeck.probe.probeDir` 必须是 `/content` 下的绝对路径，不能包含 `..`。
-- 启动需要官方扩展的终端功能可用（官方设置 `colab.terminal` 为开启），且必须先手动打开名称与当前服务器匹配的 Colab 终端。若没有匹配终端，启动会安全失败并提示重试；ColabDeck 不会自动打开、隐藏或关闭终端。
-- 改动 `sampleIntervalMs` 或 `probeDir` 会重启采集。
+- 启动新探针需要开启官方设置 `colab.terminal`，并手动打开与当前服务器匹配的官方终端。复用正在采样的探针不需要终端。
+- 改动 `sampleIntervalMs` 或 `probeDir` 不会重启正在运行的探针。要应用到现有探针，在命令面板运行 `ColabDeck: Restart Monitoring`。
 
 ## 诊断
 

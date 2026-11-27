@@ -28,17 +28,14 @@ export function ProcessTable({
       <div class="panel-head">
         <div>
           <h3>GPU processes</h3>
-          {source === 'procfs' ? <span class="badge syncing">VRAM details unavailable</span> : null}
+          {connected && source === 'procfs' ? <span class="badge syncing">VRAM details unavailable</span> : null}
         </div>
         <button class="secondary small" disabled={!connected} onClick={onRefresh}>
           Refresh
         </button>
       </div>
-      {warning ? <p class="warning-text">{warning}</p> : null}
-      {!connected ? (
-        <p class="warning-text">Monitoring is disconnected; the process list may be stale.</p>
-      ) : null}
-      {killResult ? (
+      {connected && warning ? <p class="warning-text">{warning}</p> : null}
+      {connected && killResult ? (
         <p class={killResult.ok ? 'success-text' : 'warning-text'}>
           {killResult.message ??
             (killResult.alreadyDead
@@ -46,10 +43,12 @@ export function ProcessTable({
               : `Process ${killResult.pid} stopped.`)}
         </p>
       ) : null}
-      {refreshResult && !refreshResult.ok ? (
+      {connected && refreshResult && !refreshResult.ok ? (
         <p class="warning-text">{refreshResult.message ?? 'Could not refresh GPU processes.'}</p>
       ) : null}
-      {processes.length === 0 ? (
+      {!connected ? (
+        <p class="muted">GPU processes are available when monitoring connects.</p>
+      ) : processes.length === 0 ? (
         <p class="muted">No GPU processes</p>
       ) : (
         <table>
@@ -81,7 +80,6 @@ export function ProcessTable({
                 <td>
                   <button
                     class="danger small"
-                    disabled={!connected}
                     aria-label={`Kill GPU process ${process.pid}`}
                     onClick={() => onKill(process.pid)}
                   >

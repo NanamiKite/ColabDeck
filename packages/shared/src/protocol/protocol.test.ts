@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { probeSampleSchema } from './probe.js';
-import { timeRangeToMs, webviewToHostMessageSchema } from './webview.js';
+import { timeRangeToMs, WEBVIEW_PROTOCOL_VERSION, webviewToHostMessageSchema } from './webview.js';
 
 describe('protocol schemas', () => {
   it('maps dashboard time ranges to milliseconds', () => {
@@ -33,9 +33,12 @@ describe('protocol schemas', () => {
 
   it('validates webview inbound messages', () => {
     expect(webviewToHostMessageSchema.safeParse({ type: 'READY', protocol: 1 }).success).toBe(true);
-    expect(webviewToHostMessageSchema.safeParse({ type: 'READY', protocol: 2 }).success).toBe(true);
+    expect(webviewToHostMessageSchema.safeParse({ type: 'READY', protocol: WEBVIEW_PROTOCOL_VERSION }).success).toBe(true);
     expect(webviewToHostMessageSchema.safeParse({ type: 'MOUNT_COLAB_SERVER' }).success).toBe(true);
-    expect(webviewToHostMessageSchema.safeParse({ type: 'RELOAD_WINDOW' }).success).toBe(true);
+    expect(webviewToHostMessageSchema.safeParse({ type: 'REFRESH_SERVERS' }).success).toBe(true);
+    expect(webviewToHostMessageSchema.safeParse({ type: 'START_MONITORING' }).success).toBe(true);
+    expect(webviewToHostMessageSchema.safeParse({ type: 'RETRY_PROBE' }).success).toBe(true);
+    expect(webviewToHostMessageSchema.safeParse({ type: 'RELOAD_WINDOW' }).success).toBe(false);
     expect(webviewToHostMessageSchema.safeParse({ type: 'KILL_PROCESS', requestId: 'x', pid: 0 }).success).toBe(false);
     expect(
       webviewToHostMessageSchema.safeParse({

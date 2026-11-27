@@ -17,8 +17,10 @@ Companion operations and cost-control panel for the official Google Colab VS Cod
 ## Usage
 
 1. Assign a Colab runtime in the official Colab extension.
-2. Open the ColabDeck view from the Activity Bar or click the status bar item, then choose **Mount server**.
-3. Configure thresholds in Settings → Extensions → ColabDeck.
+2. Open ColabDeck from the Activity Bar or the status bar, then click **Mount server** if the runtime isn't already mounted.
+3. Click **Start Monitoring**. If no probe is running, open the runtime's terminal in the official Colab extension, wait for it to connect, then click **Retry Monitoring**.
+
+**Refresh** updates the dashboard without starting the probe. If the dashboard reports a monitoring error, click **Retry Monitoring**. Configure thresholds in Settings → Extensions → ColabDeck.
 
 ColabDeck never calls private Google billing/quota APIs, never maintains OAuth state, and never auto-confirms the official release QuickPick.
 

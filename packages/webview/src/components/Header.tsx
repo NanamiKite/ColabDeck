@@ -1,16 +1,16 @@
 import type { JSX } from 'preact';
-import type { ServerView, TimeRange } from '@colabdeck/shared';
+import type { ProbeConnectionState, ServerView, TimeRange } from '@colabdeck/shared';
 import { RefreshIcon, SettingsIcon } from './Icons.js';
 
 interface HeaderProps {
   readonly servers: readonly ServerView[];
   readonly selectedId: string | null;
-  readonly connection: string;
+  readonly connection: ProbeConnectionState;
   readonly range: TimeRange;
   readonly onSelect: (serverId: string) => void;
   readonly onRange: (range: TimeRange) => void;
   readonly onRefresh: () => void;
-  readonly onRestart: () => void;
+  readonly onStart: () => void;
   readonly onOpenSettings: () => void;
 }
 
@@ -22,17 +22,17 @@ export function Header({
   onSelect,
   onRange,
   onRefresh,
-  onRestart,
+  onStart,
   onOpenSettings,
 }: HeaderProps): JSX.Element {
-  const connectionLabel: Readonly<Record<string, string>> = {
+  const connectionLabel: Readonly<Record<ProbeConnectionState, string>> = {
     connected: 'Connected',
     syncing: 'Starting',
     stale: 'Out of date',
     disconnected: 'Disconnected',
     error: 'Error',
   };
-  const connectionClass = connection;
+  const retryable = connection === 'error' || connection === 'stale';
   return (
     <header class="header">
       <div class="brand">
@@ -76,22 +76,16 @@ export function Header({
             <option value="1h">1h</option>
           </select>
         </label>
-        <span class={`badge ${connectionClass}`}>{connectionLabel[connection] ?? 'Unknown'}</span>
-        {connection === 'error' ||
-        connection === 'stale' ||
-        (connection === 'disconnected' && selectedId !== null) ? (
-          <button
-            class="secondary small"
-            title="Restart the monitoring probe"
-            onClick={onRestart}
-          >
-            Restart probe
+        <span class={`badge ${connection}`}>{connectionLabel[connection]}</span>
+        {selectedId !== null && (connection === 'disconnected' || retryable) ? (
+          <button class="small" onClick={onStart}>
+            {retryable ? 'Retry Monitoring' : 'Start Monitoring'}
           </button>
         ) : null}
         <button
           class="icon-button"
-          title="Refresh monitoring"
-          aria-label="Refresh monitoring"
+          title="Refresh the server list and dashboard"
+          aria-label="Refresh the server list and dashboard"
           onClick={onRefresh}
         >
           <RefreshIcon />

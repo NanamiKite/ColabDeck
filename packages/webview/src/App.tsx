@@ -40,9 +40,10 @@ export function App(): JSX.Element {
     return (
       <div class="app">
         <div class="card mismatch">
-          <h2>Dashboard needs a reload</h2>
-          <p class="muted">Reload the window to load matching ColabDeck versions.</p>
-          <button onClick={() => post({ type: 'RELOAD_WINDOW' })}>Reload window</button>
+          <h2>Dashboard version mismatch</h2>
+          <p class="muted">
+            Reopen the ColabDeck view. If the message persists, save your work and reload VS Code manually.
+          </p>
         </div>
       </div>
     );
@@ -59,6 +60,7 @@ export function App(): JSX.Element {
   const requestSnapshot = (nextRange: TimeRange): void => {
     post({ type: 'REQUEST_SNAPSHOT', requestId: crypto.randomUUID(), range: nextRange });
   };
+  const refreshServers = (): void => post({ type: 'REFRESH_SERVERS' });
 
   const handleErrorAction = (action: UiError['action']): void => {
     if (action === 'RETRY') {
@@ -79,18 +81,13 @@ export function App(): JSX.Element {
         selectedId={selectedId}
         connection={connection}
         range={range}
-        onSelect={(serverId) => {
-          post({ type: 'SELECT_SERVER', serverId });
-          requestSnapshot(range);
-        }}
+        onSelect={(serverId) => post({ type: 'SELECT_SERVER', serverId })}
         onRange={(nextRange) => {
           setRangeOverride(nextRange);
           requestSnapshot(nextRange);
         }}
-        onRefresh={() => {
-          requestSnapshot(range);
-        }}
-        onRestart={() => post({ type: 'RETRY_PROBE' })}
+        onRefresh={refreshServers}
+        onStart={() => post({ type: 'START_MONITORING' })}
         onOpenSettings={() => post({ type: 'OPEN_SETTINGS' })}
       />
       <ErrorBanner
@@ -102,12 +99,16 @@ export function App(): JSX.Element {
         <EmptyState
           hasServers={snapshot.servers.length > 0}
           onMountServer={() => post({ type: 'MOUNT_COLAB_SERVER' })}
-          onRetry={() => {
-            post({ type: 'RETRY_PROBE' });
-            requestSnapshot(range);
-          }}
+          onRefresh={refreshServers}
           onOpenSettings={() => post({ type: 'OPEN_SETTINGS' })}
         />
+      ) : connection === 'disconnected' ? (
+        <section class="card empty-state">
+          <h2>Monitoring is not running</h2>
+          <p class="muted">
+            Open the terminal for this runtime in the official Colab extension, then select Start Monitoring.
+          </p>
+        </section>
       ) : (
         <div class="dashboard">
           <section class="column dashboard-main">

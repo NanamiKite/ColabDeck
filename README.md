@@ -20,10 +20,10 @@ You need VS Code >= 1.99.3 with the official `google.colab` and `ms-toolsai.jupy
 
 1. Install ColabDeck from the Marketplace: open Extensions (`Ctrl+Shift+X`) and search for `ColabDeck`, or run `ext install NanamiKite.colabdeck` from the Command Palette.
 2. Assign a runtime in the official Colab extension.
-3. Open the dashboard from the Activity Bar or the status bar, then click **Mount server**. The dashboard opens in the sidebar by default and switches to two columns when you widen it.
-4. Charts start updating once the status is `connected`.
+3. Open ColabDeck from the Activity Bar or the status bar. If the runtime isn't already mounted in this workspace, click **Mount server**.
+4. Click **Start Monitoring**. If no probe is running, open the runtime's terminal in the official Colab extension, wait for it to connect, then click **Retry Monitoring**. The charts update when the dashboard shows **Connected**.
 
-Stuck on `Starting`? Click **Refresh**. The error card has **Retry** and **View diagnostics**. When the connection is `error` or `stale`, or a server is selected but `disconnected`, **Restart probe** appears in the header.
+Mounting doesn't start monitoring. If no workspace is open, the official Colab mount command may reload VS Code. **Refresh** updates the dashboard without starting the probe. If the dashboard reports a monitoring error, click **Retry Monitoring**.
 
 <details>
 <summary><b>Install from source</b></summary>
@@ -59,7 +59,6 @@ The guides are written in Chinese.
 
 - Releasing the runtime still needs your confirmation in the official dialog; "automatic release" only opens that dialog.
 - Only one selected server is monitored at a time.
-- Before starting monitoring, open the matching server terminal from the official Colab extension. ColabDeck only reuses that exact existing terminal; it never invokes `colab.openTerminal`, opens, hides, or disposes terminals automatically.
 - No compute-unit balance: ColabDeck does not call Google's private quota API or imitate Jupyter and Colab private protocols.
 - The Jupyter extension denies its Kernel API to this publisher, so ColabDeck cannot read whether the notebook kernel is busy. Idle Guard treats it as unknown and releases; the CUDA cache action is unavailable.
 - GPU temperature and power depend on `nvidia-smi`; some GPUs report `[N/A]`, shown as `—`.

@@ -19,7 +19,6 @@ import type { IdleGuardService } from '../idleGuard/idleGuardService.js';
 import type { Logger } from '../log.js';
 import type { ServerRegistry } from '../server/serverRegistry.js';
 import type { MonitoringService } from '../telemetry/monitoringService.js';
-import type { TelemetryStore } from '../telemetry/store.js';
 import type { ToolboxService } from '../toolbox/toolboxService.js';
 import { activateColabExtension } from '../colabExtension.js';
 import { buildDashboardHtml } from './html.js';
@@ -34,7 +33,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     private readonly context: vscode.ExtensionContext,
     private readonly logger: Logger,
     private readonly registry: ServerRegistry,
-    private readonly store: TelemetryStore,
     private readonly monitoring: MonitoringService,
     private readonly idleGuard: IdleGuardService,
     private readonly errors: ErrorCenter,
@@ -85,8 +83,8 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         this.sendSnapshot();
         this.sendTelemetryBatch(this.range);
       }),
-      this.monitoring.onSample(({ sample }) => {
-        if (webviewView.visible) {
+      this.monitoring.onSample(({ server, sample }) => {
+        if (webviewView.visible && server.id === this.registry.currentId) {
           this.post({ type: 'TELEMETRY_APPEND', sample });
         }
       }),
@@ -119,11 +117,10 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
   private buildSnapshot(): DashboardSnapshot {
     const server = this.registry.selected();
-    const monitoringMatches = server !== undefined && this.monitoring.getServer()?.id === server.id;
-    const connection = server ? (monitoringMatches ? this.monitoring.getConnection() : 'syncing') : 'disconnected';
+    const monitoringMatches = this.monitorsSelection();
     const idle = this.idleGuard.snapshot;
     return {
-      protocol: 1,
+      protocol: WEBVIEW_PROTOCOL_VERSION,
       generatedAtMs: Date.now(),
       servers: this.registry.all.map((item): ServerView => ({
         id: item.id,
@@ -132,16 +129,19 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         notebookUri: item.notebookUri,
       })),
       selectedServerId: server?.id ?? null,
-      connection,
-      probe: server && monitoringMatches ? this.monitoring.getProbeView() : null,
-      latest: server
-        ? (this.store.getLatest(server.id) ?? (monitoringMatches ? this.monitoring.getLatestSample() : null))
-        : null,
+      connection: monitoringMatches ? this.monitoring.getConnection() : 'disconnected',
+      probe: monitoringMatches ? this.monitoring.getProbeView() : null,
+      latest: monitoringMatches ? this.monitoring.getLatestSample() : null,
       idleGuard: idle.state,
       countdown: idle.countdown,
       errors: this.errors.list(),
       settings: toDashboardSettings(this.configProvider()),
     };
+  }
+
+  private monitorsSelection(): boolean {
+    const activeServer = this.monitoring.getServer();
+    return activeServer !== null && activeServer.id === this.registry.currentId;
   }
 
   private sendSnapshotIfVisible(): void {
@@ -173,7 +173,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     this.post({
       type: 'TELEMETRY_BATCH',
       range,
-      samples: this.monitoring.getSamples(timeRangeToMs(range)),
+      samples: this.monitorsSelection() ? this.monitoring.getSamples(timeRangeToMs(range)) : [],
     });
   }
 
@@ -204,7 +204,13 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
           return;
         case 'REQUEST_SNAPSHOT':
           this.range = message.range;
+          this.sendSnapshot();
           this.sendTelemetryBatch(message.range);
+          return;
+        case 'REFRESH_SERVERS':
+          await this.registry.refresh();
+          this.sendSnapshot();
+          this.sendTelemetryBatch(this.range);
           return;
         case 'SELECT_SERVER':
           this.registry.select(message.serverId);
@@ -262,12 +268,8 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
               action: 'MOUNT_COLAB_SERVER',
             });
           }
-          await this.monitoring.start(this.registry.selected());
           this.sendSnapshot();
           this.sendTelemetryBatch(this.range);
-          return;
-        case 'RELOAD_WINDOW':
-          await vscode.commands.executeCommand('workbench.action.reloadWindow');
           return;
         case 'OPEN_SETTINGS':
           await vscode.commands.executeCommand('workbench.action.openSettings', 'colabdeck');
@@ -275,12 +277,16 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         case 'OPEN_PROBE_LOG':
           await this.monitoring.openProbeLog();
           return;
-        case 'RETRY_PROBE':
-          await this.registry.refresh();
-          await this.monitoring.restart();
+        case 'START_MONITORING':
+        case 'RETRY_PROBE': {
+          const server = this.registry.selected();
+          if (server) {
+            await this.monitoring.start(server);
+          }
           this.sendSnapshot();
           this.sendTelemetryBatch(this.range);
           return;
+        }
       }
     } catch (error) {
       this.pushError(
