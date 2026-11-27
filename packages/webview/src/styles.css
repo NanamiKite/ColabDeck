@@ -246,6 +246,11 @@ button.icon-button:hover {
   min-width: 0;
 }
 
+.dashboard-main,
+.notebook-dashboard {
+  container-type: inline-size;
+}
+
 .card {
   background: var(--cd-card);
   border: 1px solid var(--cd-border);
@@ -804,6 +809,12 @@ tr:last-child td {
 @container (max-width: 480px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 480px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
   }
 }
 
