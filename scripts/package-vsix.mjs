@@ -99,7 +99,7 @@ if (!existsSync(notebookProbe)) {
 mkdirSync(releaseDir, { recursive: true });
 const out = options.out ?? path.join(releaseDir, `${manifest.name}-${manifest.version}.vsix`);
 
-const vsceArgs = ['package', '--no-dependencies', '--out', out];
+const vsceArgs = ['package', '--no-dependencies', '--no-yarn', '--out', out];
 if (options.preRelease) {
   vsceArgs.push('--pre-release');
 }
